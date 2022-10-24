@@ -90,7 +90,7 @@ public Plugin myinfo =
 {
 	name        = "SurfTimer | GOTV",
 	author      = "tslashd",
-	description = "Log start and end ticks for completions",
+	description = "Log runs and record demos",
 	version     = PLUGIN_VERSION,
 	url         = "connect clarity.surf"
 };
@@ -230,7 +230,7 @@ public void surftimer_OnNewWRCP(int client, int style, char[] time, char[] timeD
 	Format(demoMessage, sizeof(demoMessage), "WRCP %d [%s] | %s by %s --- Time %s --- Improved %s ---", stage, GetStyle(style), g_strMapName, playerName, time, timeDif);
 	SourceTV_PrintToDemoConsole("%s", demoMessage);
 
-	Format(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Game, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '0', '%d', NOW(), '0', '%d', '1', '%s', '%s', '%s', '%.1f')", DB_Name, playerId, time, strStartTick, strEndTick, g_strDemoName, g_strHostName, stage, style, g_strFastDL, g_strDownloadURL, CurrentGame(), floatTickRate);
+	Format(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '0', '%d', NOW(), '0', '%d', '1', '%s', '%s', '%.1f')", DB_Name, playerId, time, strStartTick, strEndTick, g_strDemoName, g_strHostName, stage, style, g_strFastDL, g_strDownloadURL, floatTickRate);
 	db.Query(SQL_ErrorCheckCallback, query);
 
 	populateLog(g_strWRLog);
@@ -257,13 +257,13 @@ public Action surftimer_OnMapFinished(int client, float fRunTime, char sRunTime[
 		g_bIsRecordWR = false;
 		Format(g_strWRLog, sizeof(g_strWRLog), "%s StartTick %s --- EndTick %s --- %s", g_strWRLog, strStartTick, strEndTick, g_strDemoName);
 		populateMapLog(g_strWRLog);
-		Format(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Game, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '0', '0', NOW(), '0', '%d', '1', '%s', '%s', '%s', '%.1f')", DB_Name, playerId, sRunTime, strStartTick, strEndTick, g_strDemoName, g_strHostName, style, g_strFastDL, g_strDownloadURL, CurrentGame(), floatTickRate);
+		Format(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '0', '0', NOW(), '0', '%d', '1', '%s', '%s', '%.1f')", DB_Name, playerId, sRunTime, strStartTick, strEndTick, g_strDemoName, g_strHostName, style, g_strFastDL, g_strDownloadURL, floatTickRate);
 		db.Query(SQL_ErrorCheckCallback, query);
 	}
 	else
 	{
 		Format(g_strWRLog, sizeof(g_strWRLog), "%s by %s --- Time %s (%d/%d) --- StartTick %s --- EndTick %s --- %s", g_strMapName, playerName, sRunTime, rank, total, strStartTick, strEndTick, g_strDemoName);
-		Format(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Game, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '0', '0', NOW(), '0', '%d', '0', '%s', '%s', '%s', '%.1f')", DB_Name, playerId, sRunTime, strStartTick, strEndTick, g_strDemoName, g_strHostName, style, g_strFastDL, g_strDownloadURL, CurrentGame(), floatTickRate);
+		Format(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '0', '0', NOW(), '0', '%d', '0', '%s', '%s', '%.1f')", DB_Name, playerId, sRunTime, strStartTick, strEndTick, g_strDemoName, g_strHostName, style, g_strFastDL, g_strDownloadURL, floatTickRate);
 		db.Query(SQL_ErrorCheckCallback, query);
 	}
 
@@ -304,13 +304,13 @@ public Action surftimer_OnBonusFinished(int client, float fRunTime, char sRunTim
 		g_bIsRecordWR = false;
 		Format(g_strWRLog, sizeof(g_strWRLog), "%s StartTick %s --- EndTick %s --- %s", g_strWRLog, strStartTick, strEndTick, g_strDemoName);
 		populateMapLog(g_strWRLog);
-		Format(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Game, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%d', '0', NOW(), '0', '%d', '1', '%s', '%s', '%s', '%.1f')", DB_Name, playerId, sRunTime, strStartTick, strEndTick, g_strDemoName, g_strHostName, bonusid, style, g_strFastDL, g_strDownloadURL, CurrentGame(), floatTickRate);
+		Format(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%d', '0', NOW(), '0', '%d', '1', '%s', '%s', '%.1f')", DB_Name, playerId, sRunTime, strStartTick, strEndTick, g_strDemoName, g_strHostName, bonusid, style, g_strFastDL, g_strDownloadURL, floatTickRate);
 		db.Query(SQL_ErrorCheckCallback, query);
 	}
 	else
 	{
 		Format(g_strWRLog, sizeof(g_strWRLog), "%s [Bonus %d] FINISHED by %s --- Time %s (%d/%d) --- StartTick %s --- EndTick %s --- %s", g_strMapName, bonusid, playerName, sRunTime, rank, total, strStartTick, strEndTick, g_strDemoName);
-		Format(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Game, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%d', '0', NOW(), '0', '%d', '0', '%s', '%s', '%s', '%.1f')", DB_Name, playerId, sRunTime, strStartTick, strEndTick, g_strDemoName, g_strHostName, bonusid, style, g_strFastDL, g_strDownloadURL, CurrentGame(), floatTickRate);
+		Format(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%d', '0', NOW(), '0', '%d', '0', '%s', '%s', '%.1f')", DB_Name, playerId, sRunTime, strStartTick, strEndTick, g_strDemoName, g_strHostName, bonusid, style, g_strFastDL, g_strDownloadURL, floatTickRate);
 		db.Query(SQL_ErrorCheckCallback, query);
 	}
 
@@ -336,12 +336,10 @@ public void OnDatabaseConnect(Handle owner, Handle hndl, const char[] error, any
 	// Create Tables in DB if not exist
 	char query_CreateMainTable[1024], query_CreateExpiredTable[1024];
 
-	// FormatEx(query_CreateMainTable, sizeof(query_CreateMainTable), "CREATE TABLE IF NOT EXISTS `%s` (`SteamId` text, `RunTime` text, `StartTick` text DEFAULT NULL, `EndTick` text, `DemoName` text, `Server` text, `Bonus` int DEFAULT NULL, `Stage` int DEFAULT NULL, `Date` datetime DEFAULT NULL, `MapFinished` int DEFAULT NULL, `Style` int DEFAULT NULL, `IsRecord` int DEFAULT NULL, `FastDL` text DEFAULT NULL, `DownloadURL` text DEFAULT NULL, `Game` text DEFAULT NULL, `Tickrate` double DEFAULT NULL);", DB_Name);
-	FormatEx(query_CreateMainTable, sizeof(query_CreateMainTable), "CREATE TABLE IF NOT EXISTS `%s` (`SteamId` varchar(64) NOT NULL, `RunTime` text NOT NULL, `StartTick` int NOT NULL, `EndTick` int NOT NULL, `DemoName` text NOT NULL, `Server` text NOT NULL, `Bonus` int NOT NULL, `Stage` int NOT NULL, `Date` datetime NOT NULL, `MapFinished` int NOT NULL, `Style` int NOT NULL, `IsRecord` int NOT NULL, `FastDL` text NOT NULL, `DownloadURL` text NOT NULL, `Game` text NOT NULL, `Tickrate` double NOT NULL, KEY `SteamId` (`SteamId`));", DB_Name);
+	FormatEx(query_CreateMainTable, sizeof(query_CreateMainTable), "CREATE TABLE IF NOT EXISTS `%s` (`SteamId` varchar(64) NOT NULL, `RunTime` text NOT NULL, `StartTick` int NOT NULL, `EndTick` int NOT NULL, `DemoName` text NOT NULL, `Server` text NOT NULL, `Bonus` int NOT NULL, `Stage` int NOT NULL, `Date` datetime NOT NULL, `MapFinished` int NOT NULL, `Style` int NOT NULL, `IsRecord` int NOT NULL, `FastDL` text NOT NULL, `DownloadURL` text NOT NULL, `Tickrate` double NOT NULL, KEY `SteamId` (`SteamId`));", DB_Name);
 	db.Query(SQL_ErrorCheckCallback, query_CreateMainTable, DBPrio_High);
 
-	// Format(query_CreateExpiredTable, sizeof(query_CreateExpiredTable), "CREATE TABLE IF NOT EXISTS `%s` (`SteamId` text, `RunTime` text, `StartTick` text DEFAULT NULL, `EndTick` text, `DemoName` text, `Server` text, `Bonus` int DEFAULT NULL, `Stage` int DEFAULT NULL, `Date` datetime DEFAULT NULL, `MapFinished` int DEFAULT NULL, `Style` int DEFAULT NULL, `IsRecord` int DEFAULT NULL, `FastDL` text DEFAULT NULL, `DownloadURL` text DEFAULT NULL, `Game` text DEFAULT NULL, `Tickrate` double DEFAULT NULL);", DB_Name_Expired);
-	FormatEx(query_CreateExpiredTable, sizeof(query_CreateExpiredTable), "CREATE TABLE IF NOT EXISTS `%s` (`SteamId` varchar(64) NOT NULL, `RunTime` text NOT NULL, `StartTick` int NOT NULL, `EndTick` int NOT NULL, `DemoName` text NOT NULL, `Server` text NOT NULL, `Bonus` int NOT NULL, `Stage` int NOT NULL, `Date` datetime NOT NULL, `MapFinished` int NOT NULL, `Style` int NOT NULL, `IsRecord` int NOT NULL, `FastDL` text NOT NULL, `DownloadURL` text NOT NULL, `Game` text NOT NULL, `Tickrate` double NOT NULL, KEY `SteamId` (`SteamId`));", DB_Name_Expired);
+	FormatEx(query_CreateExpiredTable, sizeof(query_CreateExpiredTable), "CREATE TABLE IF NOT EXISTS `%s` (`SteamId` varchar(64) NOT NULL, `RunTime` text NOT NULL, `StartTick` int NOT NULL, `EndTick` int NOT NULL, `DemoName` text NOT NULL, `Server` text NOT NULL, `Bonus` int NOT NULL, `Stage` int NOT NULL, `Date` datetime NOT NULL, `MapFinished` int NOT NULL, `Style` int NOT NULL, `IsRecord` int NOT NULL, `FastDL` text NOT NULL, `DownloadURL` text NOT NULL, `Tickrate` double NOT NULL, KEY `SteamId` (`SteamId`));", DB_Name_Expired);
 	db.Query(SQL_ErrorCheckCallback, query_CreateExpiredTable, DBPrio_High);
 
 	// Success Print
@@ -391,7 +389,7 @@ public void SQL_ListSteamids(Handle owner, DBResultSet results, const char[] err
 
 	// Everything is fine let's start
 	PrintToConsole(client, "########## Available Demos ##########");
-	char  SteamId[64], RunTime[32], DemoName[128], Server[128], szDate[32], buff[512], itemName[1024], itemInfo[2048], temp[32], splitArray[256][10], FastDL[256], DownloadURL[256], Game[16];
+	char  SteamId[64], RunTime[32], DemoName[128], Server[128], szDate[32], buff[512], itemName[1024], itemInfo[2048], temp[32], splitArray[256][10], FastDL[256], DownloadURL[256];
 	int   Bonus, Stage, Style, IsRecord, StartTick, EndTick;
 	float Tickrate;
 
@@ -415,8 +413,7 @@ public void SQL_ListSteamids(Handle owner, DBResultSet results, const char[] err
 		IsRecord = results.FetchInt(11);
 		results.FetchString(12, FastDL, sizeof(FastDL));
 		results.FetchString(13, DownloadURL, sizeof(DownloadURL));
-		results.FetchString(14, Game, sizeof(Game));
-		Tickrate = results.FetchFloat(15);
+		Tickrate = results.FetchFloat(14);
 
 		PrintToConsole(client, "%s - %s - %s - %s [%s] - %i - %i - %s", SteamId, szDate, DemoName, RunTime, GetStyle(Style), StartTick, EndTick, Server);
 
@@ -427,7 +424,7 @@ public void SQL_ListSteamids(Handle owner, DBResultSet results, const char[] err
 		Format(temp, strlen(temp), "%s", temp);    // wtf?? :D - is printed if this is not here
 
 		// Really need a new way of doing this
-		Format(itemInfo, sizeof(itemInfo), "%i | %i | %s | %i | %i | %i | %s | %s | %s | %.1f | %s | %s | %s", StartTick, EndTick, DemoName, Bonus, Stage, IsRecord, FastDL, DownloadURL, Game, Tickrate, SteamId, temp, RunTime);
+		Format(itemInfo, sizeof(itemInfo), "%i | %i | %s | %i | %i | %i | %s | %s | %.1f | %s | %s | %s", StartTick, EndTick, DemoName, Bonus, Stage, IsRecord, FastDL, DownloadURL, Tickrate, SteamId, temp, RunTime);
 		if (Bonus > 0)
 		{
 			Format(buff, sizeof(buff), "[%s] Bonus: %i (%s)", GetStyle(Style), Bonus, RunTime);
@@ -590,7 +587,7 @@ public int Menu_Callback(Menu menu, MenuAction action, int client, int param2)
 
 			// Really need a new way of doing this thing
 			ExplodeString(info, "|", splitArray, sizeof(splitArray), sizeof(splitArray));
-			// CPrintToChat(client, "{red}[Menu]{default} DemoName: {yellow}%s", info);
+			// CPrintToChat(client, "{red}[Menu]{default} Full Item Info: {yellow}%s", info);
 			// CPrintToChat(client, "StartTick: {yellow}: %s", splitArray[0][0]);
 			// CPrintToChat(client, "EndTick: {yellow}: %s", splitArray[1][0]);
 			// CPrintToChat(client, "DemoName: {yellow}: %s", splitArray[2][0]);
@@ -599,18 +596,17 @@ public int Menu_Callback(Menu menu, MenuAction action, int client, int param2)
 			// CPrintToChat(client, "IsRecord: {yellow}: %s", splitArray[5][0]);
 			// CPrintToChat(client, "FastDL: {yellow}: %s", splitArray[6][0]);
 			// CPrintToChat(client, "DownloadURL: {yellow}: %s", splitArray[7][0]);
-			// CPrintToChat(client, "Game: {yellow}: %s", splitArray[8][0]);
-			// CPrintToChat(client, "Tickrate: {yellow}: %s", splitArray[9][0]);
-			// CPrintToChat(client, "SteamId: {yellow}: %s", splitArray[10][0]);
-			// CPrintToChat(client, "Mapname: {yellow}: %s", splitArray[11][0]);
-			// CPrintToChat(client, "Mapname: {yellow}: %s", splitArray[12][0]);
+			// CPrintToChat(client, "Tickrate: {yellow}: %s", splitArray[8][0]);
+			// CPrintToChat(client, "SteamId: {yellow}: %s", splitArray[9][0]);
+			// CPrintToChat(client, "Mapname: {yellow}: %s", splitArray[10][0]);
+			// CPrintToChat(client, "demoRunTime: {yellow}: %s", splitArray[11][0]);
 
-			Format(demoRunTime, sizeof(demoRunTime), "%s", splitArray[12][0]);
+			Format(demoRunTime, sizeof(demoRunTime), "%s", splitArray[11][0]);
 			Format(demoStart, sizeof(demoStart), "%s", splitArray[0][0]);
 			Format(demoEnd, sizeof(demoEnd), "%s", splitArray[1][0]);
 			Format(demoName, sizeof(demoName), "%s", splitArray[2][0]);
 			Format(demoDownloadURL, sizeof(demoDownloadURL), "%s", splitArray[7][0]);
-			Format(demoPlayerId, sizeof(demoPlayerId), "%s", splitArray[10][0]);
+			Format(demoPlayerId, sizeof(demoPlayerId), "%s", splitArray[9][0]);
 			Format(demoFdl, sizeof(demoFdl), "%s", splitArray[6][0]);
 
 			TrimString(demoRunTime);
@@ -626,7 +622,6 @@ public int Menu_Callback(Menu menu, MenuAction action, int client, int param2)
 			CPrintToChat(client, "{green}[{gold}Demos{green}]{default} Start: {yellow}%s{default} | End: {yellow}%s{default} | Player: {yellow}%s", demoStart, demoEnd, demoPlayerId);
 
 			SendSelectedDemoForward(client, demoRunTime, StringToInt(demoStart), StringToInt(demoEnd), demoName, demoDownloadURL, demoPlayerId, demoFdl);
-			// menu.Display(client, MENU_TIME_FOREVER);
 		}
 		case MenuAction_Cancel:
 		{
@@ -810,19 +805,6 @@ void moveExpired()
 	PrintToServer("[Clarity-Demo-Recorder] Successfully moved expired entries!");
 }
 
-char[] CurrentGame()
-{
-	char game[16];
-	switch (g_EngineVersion)
-	{
-		case Engine_CSGO: Format(game, sizeof(game), "csgo");
-		case Engine_CSS: Format(game, sizeof(game), "css");
-		case Engine_Unknown: Format(game, sizeof(game), "unknown");
-	}
-
-	return game;
-}
-
 char[] GetStyle(int style)
 {
 	char strStyle[5];
@@ -841,13 +823,12 @@ char[] GetStyle(int style)
 }
 
 /* Forwards */
-
 void InitForwards()
 {
 	g_SelectedDemo = new GlobalForward("surftv_selected_demo", ET_Event, Param_Cell, Param_String, Param_Cell, Param_Cell, Param_String, Param_String, Param_String, Param_String);
 }
 
-/**
+/*
  * Sends a forward upon selecting an item from the listed demos menu
  *
  * @param client           	Index of the client who selected the demo
