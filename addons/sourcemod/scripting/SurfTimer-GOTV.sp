@@ -36,6 +36,7 @@ ConVar gc_HostName;
 ConVar gc_MapLogPath;
 ConVar gc_FastDL;
 ConVar gc_DownloadURL;
+ConVar gc_Prefix;
 
 /*-> Global Variables <-*/
 bool g_blnMapEnd           = false;
@@ -54,6 +55,7 @@ char g_strPlayerWR[MAX_NAME_LENGTH];
 char g_strTimeWR[128];
 char g_strFastDL[256];
 char g_strDownloadURL[256];
+char g_strPrefix[256];
 int  g_intDemoNumber = 0;
 int  g_intWRCount    = 0;
 
@@ -86,6 +88,7 @@ public void OnPluginStart()
 	gc_MapLogPath     = CreateConVar("sm_ck_gotv_maplogpath", "", "Path to where the log files for each map will be stored without trailing / (.demos/_maps)");
 	gc_DemoPath       = CreateConVar("sm_ck_gotv_demopath", "", "Path to where the demo files should be stored without trailing / (.demos/Private)");
 	gc_DownloadURL    = CreateConVar("sm_ck_gotv_downloadurl", "", "URL where the demos recorded from the plugin could be accessed");
+	gc_Prefix         = CreateConVar("sm_ck_gotv_prefix", "", "Prefix for the plugin");
 	gc_FastDL         = FindConVar("sv_downloadurl");
 	gc_ServerTickrate = FindConVar("sv_maxupdaterate");
 
@@ -136,6 +139,8 @@ public void OnConfigsExecuted()
 {
 	g_intDemoNumber = 0;
 	g_intWRCount    = 0;
+
+	GetConVarString(gc_Prefix, g_strPrefix, sizeof(g_strPrefix));
 }
 
 Action Timer_StartRecording(Handle timer, int client)
@@ -300,8 +305,8 @@ public void OnDatabaseConnect(Handle owner, Handle hndl, const char[] error, any
 {
 	if (hndl == null || strlen(error) > 0)
 	{
-		PrintToServer("[Clarity-Demo-Recorder] Unable to connect to database (%s)", error);
-		LogError("[Clarity-Demo-Recorder] Unable to connect to database (%s)", error);
+		PrintToServer("[SurfTV] Unable to connect to database (%s)", error);
+		LogError("[SurfTV] Unable to connect to database (%s)", error);
 		return;
 	}
 	db = view_as<Database>(hndl);    // Set global DB Handle
@@ -316,7 +321,7 @@ public void OnDatabaseConnect(Handle owner, Handle hndl, const char[] error, any
 	db.Query(SQL_ErrorCheckCallback, query_CreateExpiredTable, DBPrio_High);
 
 	// Success Print
-	PrintToServer("[Clarity-Demo-Recorder] Successfully connected to database!");
+	PrintToServer("[SurfTV] Successfully connected to database!");
 
 	moveExpired();
 }
@@ -326,7 +331,7 @@ public void SQL_ErrorCheckCallback(Handle owner, DBResultSet results, const char
 {
 	if (results == null || strlen(error) > 0)
 	{
-		LogError("[Clarity-Demo-Recorder] Query failed! %s", error);
+		LogError("[SurfTV] Query failed! %s", error);
 	}
 }
 
@@ -355,8 +360,8 @@ public void SQL_ListSteamids(Handle owner, DBResultSet results, const char[] err
 
 	if (results == null || strlen(error) > 0)
 	{
-		LogError("[Clarity-Demo-Recorder] Query failed! %s", error);
-		CPrintToChat(client, "[Clarity-Demo-Recorder] Query failed, please try again later.");
+		LogError("[SurfTV] Query failed! %s", error);
+		CPrintToChat(client, "%s Query failed, please try again later.", g_strPrefix);
 		return;
 	}
 
@@ -578,9 +583,9 @@ public int Menu_Callback(Menu menu, MenuAction action, int client, int param2)
 			*/
 			ExplodeString(info, " | ", splitArray, sizeof(splitArray), sizeof(splitArray));
 
-			CPrintToChat(client, "{green}[{gold}Demos{green}]{default} Link for selected demo ({gold}%s{default}):", splitArray[11][0]);
-			CPrintToChat(client, "{green}[{gold}Demos{green}]{default} {blue}%s/%s.dem", splitArray[7][0], splitArray[2][0]);
-			CPrintToChat(client, "{green}[{gold}Demos{green}]{default} Start: {yellow}%s{default} | End: {yellow}%s{default} | Player: {yellow}%s", splitArray[0][0], splitArray[1][0], splitArray[9][0]);
+			CPrintToChat(client, "%s{default} Link for selected demo ({gold}%s{default}):", g_strPrefix, splitArray[11][0]);
+			CPrintToChat(client, "%s {blue}%s/%s.dem", g_strPrefix, splitArray[7][0], splitArray[2][0]);
+			CPrintToChat(client, "%s{default} Start: {yellow}%s{default} | End: {yellow}%s{default} | Player: {yellow}%s", g_strPrefix, splitArray[0][0], splitArray[1][0], splitArray[9][0]);
 
 			SendSelectedDemoForward(client, splitArray[11][0], StringToInt(splitArray[0][0]), StringToInt(splitArray[1][0]), splitArray[2][0], splitArray[7][0], splitArray[9][0], splitArray[6][0]);
 		}
@@ -765,7 +770,7 @@ void moveExpired()
 	FormatEx(query_DeleteExpired, sizeof(query_DeleteExpired), "DELETE FROM %s WHERE `Date` < NOW() - INTERVAL 7 DAY;", DB_Name);
 	db.Query(SQL_ErrorCheckCallback, query_DeleteExpired, _, DBPrio_Normal);
 
-	PrintToServer("[Clarity-Demo-Recorder] Successfully moved expired entries!");
+	PrintToServer("[SurfTV] Successfully moved expired entries!");
 }
 
 char[] GetStyle(int style)
