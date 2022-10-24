@@ -331,7 +331,7 @@ public void OnDatabaseConnect(Handle owner, Handle hndl, const char[] error, any
 		LogError("[Clarity-Demo-Recorder] Unable to connect to database (%s)", error);
 		return;
 	}
-	db = view_as<Database>(CloneHandle(hndl));    // Set global DB Handle
+	db = view_as<Database>(hndl);    // Set global DB Handle
 
 	// Create Tables in DB if not exist
 	char query_CreateMainTable[1024], query_CreateExpiredTable[1024];
