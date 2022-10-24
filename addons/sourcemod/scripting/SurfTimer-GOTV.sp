@@ -788,7 +788,7 @@ char[] GetStyle(int style)
 /* Forwards */
 void InitForwards()
 {
-	g_SelectedDemo = new GlobalForward("surftv_selected_demo", ET_Event, Param_Cell, Param_String, Param_Cell, Param_Cell, Param_String, Param_String, Param_String, Param_String);
+	g_SelectedDemo = new GlobalForward("SurfTV_SelectedDemo", ET_Event, Param_Cell, Param_String, Param_Cell, Param_Cell, Param_String, Param_String, Param_String, Param_String);
 }
 
 /*
