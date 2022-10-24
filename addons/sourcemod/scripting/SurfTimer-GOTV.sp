@@ -427,7 +427,7 @@ public void SQL_ListSteamids(Handle owner, DBResultSet results, const char[] err
 		Format(temp, strlen(temp), "%s", temp);    // wtf?? :D - is printed if this is not here
 
 		// Really need a new way of doing this
-		Format(itemInfo, sizeof(itemInfo), "%i | %i | %s | %i | %i | %i | %s | %s | %s | %.1f | %s | %s", StartTick, EndTick, DemoName, Bonus, Stage, IsRecord, FastDL, DownloadURL, Game, Tickrate, SteamId, temp);
+		Format(itemInfo, sizeof(itemInfo), "%i | %i | %s | %i | %i | %i | %s | %s | %s | %.1f | %s | %s | %s", StartTick, EndTick, DemoName, Bonus, Stage, IsRecord, FastDL, DownloadURL, Game, Tickrate, SteamId, temp, RunTime);
 		if (Bonus > 0)
 		{
 			Format(buff, sizeof(buff), "[%s] Bonus: %i (%s)", GetStyle(Style), Bonus, RunTime);
@@ -585,7 +585,7 @@ public int Menu_Callback(Menu menu, MenuAction action, int client, int param2)
 		case MenuAction_Select:
 		{
 			// CPrintToChat(client, "{red}[Menu]{default} Param1 (client) - {yellow}%d{default} | Param2 - {yellow}%d{default}", client, param2);
-			char info[1024], demoName[256], demoDownloadURL[256], demoPlayerId[64], demoFdl[256], demoStart[32], demoEnd[32];
+			char info[1024], demoName[256], demoDownloadURL[256], demoPlayerId[64], demoFdl[256], demoStart[32], demoEnd[32], demoRunTime[64];
 			menu.GetItem(param2, info, sizeof(info));
 
 			// Really need a new way of doing this thing
@@ -603,7 +603,9 @@ public int Menu_Callback(Menu menu, MenuAction action, int client, int param2)
 			// CPrintToChat(client, "Tickrate: {yellow}: %s", splitArray[9][0]);
 			// CPrintToChat(client, "SteamId: {yellow}: %s", splitArray[10][0]);
 			// CPrintToChat(client, "Mapname: {yellow}: %s", splitArray[11][0]);
+			// CPrintToChat(client, "Mapname: {yellow}: %s", splitArray[12][0]);
 
+			Format(demoRunTime, sizeof(demoRunTime), "%s", splitArray[12][0]);
 			Format(demoStart, sizeof(demoStart), "%s", splitArray[0][0]);
 			Format(demoEnd, sizeof(demoEnd), "%s", splitArray[1][0]);
 			Format(demoName, sizeof(demoName), "%s", splitArray[2][0]);
@@ -611,6 +613,7 @@ public int Menu_Callback(Menu menu, MenuAction action, int client, int param2)
 			Format(demoPlayerId, sizeof(demoPlayerId), "%s", splitArray[10][0]);
 			Format(demoFdl, sizeof(demoFdl), "%s", splitArray[6][0]);
 
+			TrimString(demoRunTime);
 			TrimString(demoStart);
 			TrimString(demoEnd);
 			TrimString(demoName);
@@ -618,10 +621,11 @@ public int Menu_Callback(Menu menu, MenuAction action, int client, int param2)
 			TrimString(demoPlayerId);
 			TrimString(demoFdl);
 
-			CPrintToChat(client, "{green}[{gold}Demos{green}]{default} Download selected demo from:");
+			CPrintToChat(client, "{green}[{gold}Demos{green}]{default} Link for selected demo ({gold}%s{default}):", demoRunTime);
 			CPrintToChat(client, "{green}[{gold}Demos{green}]{default} {blue}%s/%s.dem", demoDownloadURL, demoName);
+			CPrintToChat(client, "{green}[{gold}Demos{green}]{default} Start: {yellow}%s{default} | End: {yellow}%s{default} | Player: {yellow}%s", demoStart, demoEnd, demoPlayerId);
 
-			SendSelectedDemoForward(client, StringToInt(demoStart), StringToInt(demoEnd), demoName, demoDownloadURL, demoPlayerId, demoFdl);
+			SendSelectedDemoForward(client, demoRunTime, StringToInt(demoStart), StringToInt(demoEnd), demoName, demoDownloadURL, demoPlayerId, demoFdl);
 			// menu.Display(client, MENU_TIME_FOREVER);
 		}
 		case MenuAction_Cancel:
@@ -840,13 +844,14 @@ char[] GetStyle(int style)
 
 void InitForwards()
 {
-	g_SelectedDemo = new GlobalForward("surftv_selected_demo", ET_Event, Param_Cell, Param_Cell, Param_Cell, Param_String, Param_String, Param_String, Param_String);
+	g_SelectedDemo = new GlobalForward("surftv_selected_demo", ET_Event, Param_Cell, Param_String, Param_Cell, Param_Cell, Param_String, Param_String, Param_String, Param_String);
 }
 
 /**
  * Sends a forward upon selecting an item from the listed demos menu
  *
  * @param client           	Index of the client who selected the demo
+ * @param demoRunTime		Time format string of the selected run
  * @param demoStart            	Start tick of the selected demo
  * @param demoEnd				End tick of the selected demo
  * @param demoName			Name of the demo selected
@@ -854,13 +859,14 @@ void InitForwards()
  * @param demoPlayer		Id of the player on the demo
  * @param demoFdl			FastDL for the map of the selected demo
  */
-void SendSelectedDemoForward(int client, int demoStart, int demoEnd, const char[] demoName, const char[] dlUrl, const char[] demoPlayer, const char[] demoFdl)
+void SendSelectedDemoForward(int client, const char[] demoRunTime, int demoStart, int demoEnd, const char[] demoName, const char[] dlUrl, const char[] demoPlayer, const char[] demoFdl)
 {
 	/* Start function call */
 	Call_StartForward(g_SelectedDemo);
 
 	/* Push parameters one at a time */
 	Call_PushCell(client);
+	Call_PushString(demoRunTime);
 	Call_PushCell(demoStart);
 	Call_PushCell(demoEnd);
 	Call_PushString(demoName);
