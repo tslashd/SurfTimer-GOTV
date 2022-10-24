@@ -15,33 +15,6 @@
 #define DB_Name         "wr_demos"
 #define DB_Name_Expired "wr_demos_expired"
 /*###############################################*/
-/*
-            // CPrintToChat(param1, "StartTick: {yellow}: %s", splitArray[0][0]);
-            // CPrintToChat(param1, "EndTick: {yellow}: %s", splitArray[1][0]);
-            // CPrintToChat(param1, "DemoName: {yellow}: %s", splitArray[2][0]);
-            // CPrintToChat(param1, "Bonus: {yellow}: %s", splitArray[3][0]);
-            // CPrintToChat(param1, "Stage: {yellow}: %s", splitArray[4][0]);
-            // CPrintToChat(param1, "IsRecord: {yellow}: %s", splitArray[5][0]);
-            // CPrintToChat(param1, "FastDL: {yellow}: %s", splitArray[6][0]);
-            // CPrintToChat(param1, "DownloadURL: {yellow}: %s", splitArray[7][0]);
-            // CPrintToChat(param1, "Game: {yellow}: %s", splitArray[8][0]);
-            // CPrintToChat(param1, "Tickrate: {yellow}: %s", splitArray[9][0]);
-            // CPrintToChat(param1, "SteamId: {yellow}: %s", splitArray[10][0]);
-            // CPrintToChat(param1, "Mapname: {yellow}: %s", splitArray[11][0]);
-enum struct DemoInfo
-{
-    int  sTick;
-    int  eTick;
-    int  steamId;
-    char dName;
-    int  bonus;
-    int  stage;
-    int  isRecord;
-    char fDl;
-    char dUrl;
-    char mName;
-}
-*/
 
 /*-> Menus <-*/
 Menu menu_main;
@@ -424,6 +397,7 @@ public void SQL_ListSteamids(Handle owner, DBResultSet results, const char[] err
 		Format(temp, strlen(temp), "%s", temp);    // wtf?? :D - is printed if this is not here
 
 		// Really need a new way of doing this
+		// Don't fix if it ain't broken ig lul
 		Format(itemInfo, sizeof(itemInfo), "%i | %i | %s | %i | %i | %i | %s | %s | %.1f | %s | %s | %s", StartTick, EndTick, DemoName, Bonus, Stage, IsRecord, FastDL, DownloadURL, Tickrate, SteamId, temp, RunTime);
 		if (Bonus > 0)
 		{
@@ -581,47 +555,34 @@ public int Menu_Callback(Menu menu, MenuAction action, int client, int param2)
 		}
 		case MenuAction_Select:
 		{
-			// CPrintToChat(client, "{red}[Menu]{default} Param1 (client) - {yellow}%d{default} | Param2 - {yellow}%d{default}", client, param2);
-			char info[1024], demoName[256], demoDownloadURL[256], demoPlayerId[64], demoFdl[256], demoStart[32], demoEnd[32], demoRunTime[64];
+			char info[1024];
 			menu.GetItem(param2, info, sizeof(info));
+			// CPrintToChat(client, "{red}[Menu]{default} Param1 (client) - {yellow}%d{default} | Param2 - {yellow}%d{default}", client, param2);
+			// CPrintToChat(client, "{red}[Menu]{default} Full Item Info: {yellow}%s", info);
 
 			// Really need a new way of doing this thing
-			ExplodeString(info, "|", splitArray, sizeof(splitArray), sizeof(splitArray));
-			// CPrintToChat(client, "{red}[Menu]{default} Full Item Info: {yellow}%s", info);
-			// CPrintToChat(client, "StartTick: {yellow}: %s", splitArray[0][0]);
-			// CPrintToChat(client, "EndTick: {yellow}: %s", splitArray[1][0]);
-			// CPrintToChat(client, "DemoName: {yellow}: %s", splitArray[2][0]);
-			// CPrintToChat(client, "Bonus: {yellow}: %s", splitArray[3][0]);
-			// CPrintToChat(client, "Stage: {yellow}: %s", splitArray[4][0]);
-			// CPrintToChat(client, "IsRecord: {yellow}: %s", splitArray[5][0]);
-			// CPrintToChat(client, "FastDL: {yellow}: %s", splitArray[6][0]);
-			// CPrintToChat(client, "DownloadURL: {yellow}: %s", splitArray[7][0]);
-			// CPrintToChat(client, "Tickrate: {yellow}: %s", splitArray[8][0]);
-			// CPrintToChat(client, "SteamId: {yellow}: %s", splitArray[9][0]);
-			// CPrintToChat(client, "Mapname: {yellow}: %s", splitArray[10][0]);
-			// CPrintToChat(client, "demoRunTime: {yellow}: %s", splitArray[11][0]);
+			// Don't fix if it ain't broken ig lul
+			/*
+			    StartTick = splitArray[0][0]
+			    EndTick = splitArray[1][0]
+			    DemoName = splitArray[2][0]
+			    Bonus = splitArray[3][0]
+			    Stage = splitArray[4][0]
+			    IsRecord = splitArray[5][0]
+			    FastDL = splitArray[6][0]
+			    DownloadURL = splitArray[7][0]
+			    Tickrate = splitArray[8][0]
+			    SteamId = splitArray[9][0]
+			    Mapname = splitArray[10][0]
+			    demoRunTime = splitArray[11][0]
+			*/
+			ExplodeString(info, " | ", splitArray, sizeof(splitArray), sizeof(splitArray));
 
-			Format(demoRunTime, sizeof(demoRunTime), "%s", splitArray[11][0]);
-			Format(demoStart, sizeof(demoStart), "%s", splitArray[0][0]);
-			Format(demoEnd, sizeof(demoEnd), "%s", splitArray[1][0]);
-			Format(demoName, sizeof(demoName), "%s", splitArray[2][0]);
-			Format(demoDownloadURL, sizeof(demoDownloadURL), "%s", splitArray[7][0]);
-			Format(demoPlayerId, sizeof(demoPlayerId), "%s", splitArray[9][0]);
-			Format(demoFdl, sizeof(demoFdl), "%s", splitArray[6][0]);
+			CPrintToChat(client, "{green}[{gold}Demos{green}]{default} Link for selected demo ({gold}%s{default}):", splitArray[11][0]);
+			CPrintToChat(client, "{green}[{gold}Demos{green}]{default} {blue}%s/%s.dem", splitArray[7][0], splitArray[2][0]);
+			CPrintToChat(client, "{green}[{gold}Demos{green}]{default} Start: {yellow}%s{default} | End: {yellow}%s{default} | Player: {yellow}%s", splitArray[0][0], splitArray[1][0], splitArray[9][0]);
 
-			TrimString(demoRunTime);
-			TrimString(demoStart);
-			TrimString(demoEnd);
-			TrimString(demoName);
-			TrimString(demoDownloadURL);
-			TrimString(demoPlayerId);
-			TrimString(demoFdl);
-
-			CPrintToChat(client, "{green}[{gold}Demos{green}]{default} Link for selected demo ({gold}%s{default}):", demoRunTime);
-			CPrintToChat(client, "{green}[{gold}Demos{green}]{default} {blue}%s/%s.dem", demoDownloadURL, demoName);
-			CPrintToChat(client, "{green}[{gold}Demos{green}]{default} Start: {yellow}%s{default} | End: {yellow}%s{default} | Player: {yellow}%s", demoStart, demoEnd, demoPlayerId);
-
-			SendSelectedDemoForward(client, demoRunTime, StringToInt(demoStart), StringToInt(demoEnd), demoName, demoDownloadURL, demoPlayerId, demoFdl);
+			SendSelectedDemoForward(client, splitArray[11][0], StringToInt(splitArray[0][0]), StringToInt(splitArray[1][0]), splitArray[2][0], splitArray[7][0], splitArray[9][0], splitArray[6][0]);
 		}
 		case MenuAction_Cancel:
 		{
