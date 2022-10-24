@@ -619,31 +619,33 @@ void Start_Recording()
 
 	// createFolders(g_strDemoPath, g_strMapLog, g_strDownloadFolder);
 
-	if (SourceTV_IsRecording())
-		PrintToServer(">>> Already recording <<<");
-	else
+	if (!SourceTV_IsRecording())
 	{
+		char logMsg[1000];
+		Format(logMsg, sizeof(logMsg), "================================= %s.dem ================================= %s =================================", g_strDemoName, g_strHostName);
 		FormatTime(g_strTime, sizeof(g_strTime), "%d_%m_%y-%H_%M_%S", GetTime());
 		Format(g_strDemoName, sizeof(g_strDemoName), "%s-%s-%d", g_strTime, g_strMapName, g_intDemoNumber);
+
 		// ServerCommand("mp_warmup_start");
 		ServerCommand("mp_restartgame 1");
 		ServerCommand("tv_record %s/%s", g_strDemoPath, g_strDemoName);
-		if (strlen(g_strLogFile) > 0)
-			LogToFileEx(g_strLogFile, "================================= %s.dem ================================= %s =================================", g_strDemoName, g_strHostName);
+
+		populateLog(logMsg);
 		PrintToServer("Started recording - %s", g_strDemoName);
 	}
 }
 
 void Stop_Recording()
 {
-	if (strlen(g_strLogFile) > 0)
-		LogToFileEx(g_strLogFile, "Total replays for %s : %d", g_strMapName, g_intDemoNumber);
+	char logMsg[256];
+	Format(logMsg, sizeof(logMsg), "Total replays for %s : %d", g_strMapName, g_intDemoNumber);
+
 	ServerCommand("tv_stoprecord");
+	populateLog(logMsg);
 
 	// Update all entries from current map in DB as MapFinished = 1
 	updateEntries();
 
-	// if (g_intWRCount == 0)
 	if (g_intDemoNumber <= 0)
 		deleteDemo(g_strDemoPath, g_strDemoName, g_strLogFile);
 }
@@ -686,25 +688,25 @@ stock void deleteDemo(char[] path, char[] name, char[] log)
 {
 	if (DirExists(path))
 	{
-		char szPath[500];
+		char szPath[500], logMsg[1000];
 		Format(szPath, sizeof(szPath), "%s/%s.dem", path, name);
 
 		if (FileExists(szPath))
 		{
 			DeleteFile(szPath);
-			if (strlen(g_strLogFile) > 0)
-				LogToFileEx(log, "Demo deleted - %s", szPath);
+			Format(logMsg, sizeof(logMsg), "Demo deleted - %s", szPath);
+			populateLog(logMsg);
 		}
 		else
 		{
-			if (strlen(g_strLogFile) > 0)
-				LogToFileEx(log, "Demo does NOT exist - %s", szPath);
+			Format(logMsg, sizeof(logMsg), "Demo does NOT exist - %s", szPath);
+			populateLog(logMsg);
 		}
 	}
 	else
 	{
-		if (strlen(g_strLogFile) > 0)
-			LogToFileEx(log, "Dir does NOT exist - %s", path);
+		Format(logMsg, sizeof(logMsg), "Dir does NOT exist - %s", path);
+		populateLog(logMsg);
 	}
 }
 
