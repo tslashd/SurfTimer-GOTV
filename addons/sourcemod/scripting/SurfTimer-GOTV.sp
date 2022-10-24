@@ -9,7 +9,7 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-#define PLUGIN_VERSION "3.0"
+#define PLUGIN_VERSION "0.1"
 
 /*-> Database table name to use for connection <-*/
 #define DB_Name         "wr_demos"
