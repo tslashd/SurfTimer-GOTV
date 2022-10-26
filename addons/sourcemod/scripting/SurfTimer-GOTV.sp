@@ -145,6 +145,9 @@ public void OnConfigsExecuted()
 
 Action Timer_StartRecording(Handle timer, int client)
 {
+	if (SourceTV_IsRecording())
+		return Plugin_Handled;
+
 	if (!IsClientSourceTV(client) && !IsFakeClient(client) && !SourceTV_IsRecording())
 	{
 		Start_Recording();
@@ -691,9 +694,10 @@ stock void populateMapLog(char[] message)
 
 stock void deleteDemo(char[] path, char[] name, char[] log)
 {
+	char logMsg[1000];
 	if (DirExists(path))
 	{
-		char szPath[500], logMsg[1000];
+		char szPath[500];
 		Format(szPath, sizeof(szPath), "%s/%s.dem", path, name);
 
 		if (FileExists(szPath))
