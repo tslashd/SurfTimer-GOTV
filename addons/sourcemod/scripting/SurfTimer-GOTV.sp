@@ -630,9 +630,9 @@ void Start_Recording()
 	if (!SourceTV_IsRecording())
 	{
 		char logMsg[1000];
-		Format(logMsg, sizeof(logMsg), "================================= %s.dem ================================= %s =================================", g_strDemoName, g_strHostName);
 		FormatTime(g_strTime, sizeof(g_strTime), "%d_%m_%y-%H_%M_%S", GetTime());
 		Format(g_strDemoName, sizeof(g_strDemoName), "%s-%s-%d", g_strTime, g_strMapName, g_intDemoNumber);
+		Format(logMsg, sizeof(logMsg), "================================= %s.dem ================================= %s =================================", g_strDemoName, g_strHostName);
 
 		// ServerCommand("mp_warmup_start");
 		ServerCommand("mp_restartgame 1");
