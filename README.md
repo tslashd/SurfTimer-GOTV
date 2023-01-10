@@ -42,7 +42,7 @@ Keeps track of all runs made on the server and keeps demos for all **Runs**
 ### What it would be nice to do:
  - [ ] Delete demos older than **X**
  - [x] Disable text logs if convar is empty
- - [ ] Add option to lock **WR** demos section to a certain in-game flag
- - [ ] Make an include file
+ - [x] Add option to lock **WR** demos section to a certain in-game flag
+ - [x] Make an include file
  - [ ] Improve the way demo data is sent to menu (splitting is possibly not the most optimal way)
  - [ ] ....?
