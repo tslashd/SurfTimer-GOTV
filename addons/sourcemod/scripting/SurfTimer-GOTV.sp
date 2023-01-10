@@ -9,65 +9,65 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-#define PLUGIN_VERSION "0.1"
+#define PLUGIN_VERSION	"0.1"
 
 /*-> Database table name to use for connection <-*/
-#define DB_Name         "wr_demos"
+#define DB_Name			"wr_demos"
 #define DB_Name_Expired "wr_demos_expired"
 /*###############################################*/
 
 /*-> Menus <-*/
-Menu menu_main;
-Menu submenu_main;
-Menu menu_list_demos;
+Menu		  menu_main;
+Menu		  submenu_main;
+Menu		  menu_list_demos;
 
 /*-> DB <-*/
-Database db = null;
+Database	  db = null;
 
 /*-> FORWARDS <-*/
 GlobalForward g_SelectedDemo;
 
 /*-> ConVars <-*/
-ConVar gc_tvEnabled;
-ConVar gc_ServerTickrate;
-ConVar gc_LogPath;
-ConVar gc_DemoPath;
-ConVar gc_HostName;
-ConVar gc_MapLogPath;
-ConVar gc_FastDL;
-ConVar gc_DownloadURL;
-ConVar gc_Prefix;
+ConVar		  gc_tvEnabled;
+ConVar		  gc_ServerTickrate;
+ConVar		  gc_LogPath;
+ConVar		  gc_DemoPath;
+ConVar		  gc_HostName;
+ConVar		  gc_MapLogPath;
+ConVar		  gc_FastDL;
+ConVar		  gc_DownloadURL;
+ConVar		  gc_Prefix;
 
 /*-> Global Variables <-*/
-bool g_blnMapEnd           = false;
-bool g_bIsSurfTimerEnabled = false;
-bool g_bIsRecordWR         = false;
-bool g_bPersonalDemos[MAXPLAYERS];
-char g_strMapName[128];
-char g_strDemoName[500];
-char g_strDemoPath[PLATFORM_MAX_PATH];
-char g_strTime[128];
-char g_strLogFile[500];
-char g_strMapLog[500];
-char g_strWRLog[500];
-char g_strHostName[500];
-char g_strPlayerWR[MAX_NAME_LENGTH];
-char g_strTimeWR[128];
-char g_strFastDL[256];
-char g_strDownloadURL[256];
-char g_strPrefix[256];
-int  g_intDemoNumber = 0;
-int  g_intWRCount    = 0;
+bool		  g_blnMapEnd			= false;
+bool		  g_bIsSurfTimerEnabled = false;
+bool		  g_bIsRecordWR			= false;
+bool		  g_bPersonalDemos[MAXPLAYERS];
+char		  g_strMapName[128];
+char		  g_strDemoName[500];
+char		  g_strDemoPath[PLATFORM_MAX_PATH];
+char		  g_strTime[128];
+char		  g_strLogFile[500];
+char		  g_strMapLog[500];
+char		  g_strWRLog[500];
+char		  g_strHostName[500];
+char		  g_strPlayerWR[MAX_NAME_LENGTH];
+char		  g_strTimeWR[128];
+char		  g_strFastDL[256];
+char		  g_strDownloadURL[256];
+char		  g_strPrefix[256];
+int			  g_intDemoNumber = 0;
+int			  g_intWRCount	  = 0;
 
 EngineVersion g_EngineVersion;
 
 public Plugin myinfo =
 {
-	name        = "SurfTimer | GOTV",
-	author      = "tslashd",
+	name		= "SurfTimer | GOTV",
+	author		= "tslashd",
 	description = "Log runs and record demos",
-	version     = PLUGIN_VERSION,
-	url         = "connect clarity.surf"
+	version		= PLUGIN_VERSION,
+	url			= "connect clarity.surf"
 };
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
@@ -84,20 +84,20 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 public void OnPluginStart()
 {
-	gc_LogPath        = CreateConVar("sm_ck_gotv_log", "", "Path to where the log should be stored (addons/sourcemod/logs/_SurfTimer-GOTV.txt)");
-	gc_MapLogPath     = CreateConVar("sm_ck_gotv_maplogpath", "", "Path to where the log files for each map will be stored without trailing / (.demos/_maps)");
-	gc_DemoPath       = CreateConVar("sm_ck_gotv_demopath", "", "Path to where the demo files should be stored without trailing / (.demos/Private)");
-	gc_DownloadURL    = CreateConVar("sm_ck_gotv_downloadurl", "", "URL where the demos recorded from the plugin could be accessed");
-	gc_Prefix         = CreateConVar("sm_ck_gotv_prefix", "", "Prefix for the plugin");
-	gc_FastDL         = FindConVar("sv_downloadurl");
+	gc_LogPath		  = CreateConVar("sm_ck_gotv_log", "", "Path to where the log should be stored (addons/sourcemod/logs/_SurfTimer-GOTV.txt)");
+	gc_MapLogPath	  = CreateConVar("sm_ck_gotv_maplogpath", "", "Path to where the log files for each map will be stored without trailing / (.demos/_maps)");
+	gc_DemoPath		  = CreateConVar("sm_ck_gotv_demopath", "", "Path to where the demo files should be stored without trailing / (.demos/Private)");
+	gc_DownloadURL	  = CreateConVar("sm_ck_gotv_downloadurl", "", "URL where the demos recorded from the plugin could be accessed");
+	gc_Prefix		  = CreateConVar("sm_ck_gotv_prefix", "", "Prefix for the plugin");
+	gc_FastDL		  = FindConVar("sv_downloadurl");
 	gc_ServerTickrate = FindConVar("sv_maxupdaterate");
 
 	// TEST
 	RegAdminCmd("sm_demos_test", Command_Test, ADMFLAG_ROOT, "Test");
-	RegAdminCmd("sm_demos_list", Menu_Command, ADMFLAG_CUSTOM5, "List all demos available for client");
-	RegAdminCmd("sm_demos", Menu_Command, ADMFLAG_CUSTOM5, "List all demos available for client");
-	RegAdminCmd("sm_admin_demos", Menu_Command, ADMFLAG_CUSTOM4, "List all WR demos available");
-	RegAdminCmd("sm_wrdemos", Menu_Command, ADMFLAG_CUSTOM4, "List all WR demos available");
+	RegConsoleCmd("sm_demos", Menu_Command, "List all demos available for client");
+	RegConsoleCmd("sm_demos_list", Menu_Command, "List all demos available for client");
+	RegConsoleCmd("sm_admin_demos", Menu_Command, "List all demos available for client");
+	RegConsoleCmd("sm_wrdemos", Menu_Command, "List all demos available for client");
 
 	CreateConVar("sm_demorecorder_version", PLUGIN_VERSION, "Standard plugin version ConVar. Please don't change me!", FCVAR_REPLICATED | FCVAR_NOTIFY | FCVAR_DONTRECORD);
 
@@ -127,7 +127,7 @@ public void OnLibraryRemoved(const char[] name)
 public void OnMapStart()
 {
 	float fRecordTime;
-	g_blnMapEnd  = false;
+	g_blnMapEnd	 = false;
 	gc_tvEnabled = FindConVar("tv_enable");
 	if (!gc_tvEnabled.BoolValue)
 		SetFailState("GOTV is NOT enabled on this server.");
@@ -138,7 +138,7 @@ public void OnMapStart()
 public void OnConfigsExecuted()
 {
 	g_intDemoNumber = 0;
-	g_intWRCount    = 0;
+	g_intWRCount	= 0;
 
 	GetConVarString(gc_Prefix, g_strPrefix, sizeof(g_strPrefix));
 }
@@ -148,7 +148,7 @@ Action Timer_StartRecording(Handle timer, int client)
 	if (SourceTV_IsRecording())
 		return Plugin_Handled;
 
-	if (!IsClientSourceTV(client) && !IsFakeClient(client) && !SourceTV_IsRecording())
+	if (!IsClientSourceTV(client) && !IsFakeClient(client) && !SourceTV_IsRecording() && IsClientInGame(client))
 	{
 		Start_Recording();
 	}
@@ -197,10 +197,10 @@ public void surftimer_OnNewRecord(int client, int style, char[] time, char[] tim
 
 public void surftimer_OnNewWRCP(int client, int style, char[] time, char[] timeDif, int stage, float fRunTime)
 {
-	g_intWRCount        = g_intWRCount + 1;
-	g_intDemoNumber     = g_intDemoNumber + 1;
+	g_intWRCount		= g_intWRCount + 1;
+	g_intDemoNumber		= g_intDemoNumber + 1;
 	float floatTickRate = GetConVarFloat(gc_ServerTickrate);
-	int   currentTick   = SourceTV_GetRecordingTick();
+	int	  currentTick	= SourceTV_GetRecordingTick();
 	char  playerName[MAX_NAME_LENGTH], demoMessage[256], wrcpEndTick[64], wrcpStartTick[64], query[1024], playerId[64];
 	GetClientName(client, playerName, sizeof(playerName));
 	GetClientAuthId(client, AuthId_SteamID64, playerId, sizeof(playerId));
@@ -221,9 +221,9 @@ public void surftimer_OnNewWRCP(int client, int style, char[] time, char[] timeD
 
 public Action surftimer_OnMapFinished(int client, float fRunTime, char sRunTime[54], float PBDiff, float WRDiff, int rank, int total, int style)
 {
-	g_intDemoNumber     = g_intDemoNumber + 1;
+	g_intDemoNumber		= g_intDemoNumber + 1;
 	float floatTickRate = GetConVarFloat(gc_ServerTickrate);
-	int   currentTick   = SourceTV_GetRecordingTick();
+	int	  currentTick	= SourceTV_GetRecordingTick();
 	char  strStartTick[64], strEndTick[64], strRunTime[64], playerName[MAX_NAME_LENGTH], query[1024], playerId[64];
 	GetClientName(client, playerName, sizeof(playerName));
 	GetClientAuthId(client, AuthId_SteamID64, playerId, sizeof(playerId));
@@ -267,8 +267,8 @@ public Action surftimer_OnCheckpoint(int client, float fRunTime, char sRunTime[5
 
 public Action surftimer_OnBonusFinished(int client, float fRunTime, char sRunTime[54], float fPBDiff, float fSRDiff, int rank, int total, int bonusid, int style)
 {
-	g_intDemoNumber     = g_intDemoNumber + 1;
-	int   currentTick   = SourceTV_GetRecordingTick();
+	g_intDemoNumber		= g_intDemoNumber + 1;
+	int	  currentTick	= SourceTV_GetRecordingTick();
 	float floatTickRate = GetConVarFloat(gc_ServerTickrate);
 	char  strStartTick[64], strEndTick[64], strRunTime[64], playerName[MAX_NAME_LENGTH], query[1024], playerId[64];
 
@@ -313,7 +313,7 @@ public void OnDatabaseConnect(Handle owner, Handle hndl, const char[] error, any
 		LogError("[SurfTV] Unable to connect to database (%s)", error);
 		return;
 	}
-	db = view_as<Database>(hndl);    // Set global DB Handle
+	db = view_as<Database>(hndl);	 // Set global DB Handle
 
 	// Create Tables in DB if not exist
 	char query_CreateMainTable[1024], query_CreateExpiredTable[1024];
@@ -348,7 +348,10 @@ public Action Menu_Command(int client, int args)
 	menu_main.SetTitle("Select Demo Type:");
 
 	menu_main.AddItem("item_personal_runs", "PR", ITEMDRAW_CONTROL);
-	menu_main.AddItem("item_wrs", "WR", ITEMDRAW_CONTROL);
+	if (CheckCommandAccess(client, "", ADMFLAG_CUSTOM4))
+		menu_main.AddItem("item_wrs", "WR", ITEMDRAW_CONTROL);
+	else
+		menu_main.AddItem("item_wrs", "WR", ITEMDRAW_DISABLED);
 
 	menu_main.ExitButton = true;
 	menu_main.Display(client, MENU_TIME_FOREVER);
@@ -360,7 +363,7 @@ public Action Menu_Command(int client, int args)
 public void SQL_ListSteamids(Handle owner, DBResultSet results, const char[] error, any userid)
 {
 	int client = GetClientOfUserId(userid);
-	if (IsFakeClient(client)) return;    // Stop if not valid!
+	if (IsFakeClient(client)) return;	 // Stop if not valid!
 
 	if (results == null || strlen(error) > 0)
 	{
@@ -372,7 +375,7 @@ public void SQL_ListSteamids(Handle owner, DBResultSet results, const char[] err
 	// Everything is fine let's start
 	PrintToConsole(client, "########## Available Demos ##########");
 	char  SteamId[64], RunTime[32], DemoName[128], Server[128], szDate[32], buff[512], itemName[1024], itemInfo[2048], temp[32], splitArray[256][10], FastDL[256], DownloadURL[256];
-	int   Bonus, Stage, Style, IsRecord, StartTick, EndTick;
+	int	  Bonus, Stage, Style, IsRecord, StartTick, EndTick;
 	float Tickrate;
 
 	menu_list_demos = new Menu(Menu_Callback);
@@ -385,13 +388,13 @@ public void SQL_ListSteamids(Handle owner, DBResultSet results, const char[] err
 		results.FetchString(0, SteamId, sizeof(SteamId));
 		results.FetchString(1, RunTime, sizeof(RunTime));
 		StartTick = results.FetchInt(2);
-		EndTick   = results.FetchInt(3);
+		EndTick	  = results.FetchInt(3);
 		results.FetchString(4, DemoName, sizeof(DemoName));
 		results.FetchString(5, Server, sizeof(Server));
 		Bonus = results.FetchInt(6);
 		Stage = results.FetchInt(7);
 		results.FetchString(8, szDate, sizeof(szDate));
-		Style    = results.FetchInt(10);
+		Style	 = results.FetchInt(10);
 		IsRecord = results.FetchInt(11);
 		results.FetchString(12, FastDL, sizeof(FastDL));
 		results.FetchString(13, DownloadURL, sizeof(DownloadURL));
@@ -403,7 +406,7 @@ public void SQL_ListSteamids(Handle owner, DBResultSet results, const char[] err
 		ExplodeString(DemoName, "surf_", splitArray, sizeof(splitArray), sizeof(splitArray));
 
 		Format(temp, strlen(splitArray[1][0]), "%s", splitArray[1][0]);
-		Format(temp, strlen(temp), "%s", temp);    // wtf?? :D - is printed if this is not here
+		Format(temp, strlen(temp), "%s", temp);	   // wtf?? :D - is printed if this is not here
 
 		// Really need a new way of doing this
 		// Don't fix if it ain't broken ig lul
@@ -572,24 +575,24 @@ public int Menu_Callback(Menu menu, MenuAction action, int client, int param2)
 			// Really need a new way of doing this thing
 			// Don't fix if it ain't broken ig lul
 			/*
-			    StartTick = splitArray[0][0]
-			    EndTick = splitArray[1][0]
-			    DemoName = splitArray[2][0]
-			    Bonus = splitArray[3][0]
-			    Stage = splitArray[4][0]
-			    IsRecord = splitArray[5][0]
-			    FastDL = splitArray[6][0]
-			    DownloadURL = splitArray[7][0]
-			    Tickrate = splitArray[8][0]
-			    SteamId = splitArray[9][0]
-			    Mapname = splitArray[10][0]
-			    demoRunTime = splitArray[11][0]
+				StartTick = splitArray[0][0]
+				EndTick = splitArray[1][0]
+				DemoName = splitArray[2][0]
+				Bonus = splitArray[3][0]
+				Stage = splitArray[4][0]
+				IsRecord = splitArray[5][0]
+				FastDL = splitArray[6][0]
+				DownloadURL = splitArray[7][0]
+				Tickrate = splitArray[8][0]
+				SteamId = splitArray[9][0]
+				Mapname = splitArray[10][0]
+				demoRunTime = splitArray[11][0]
 			*/
 			ExplodeString(info, " | ", splitArray, sizeof(splitArray), sizeof(splitArray));
 
-			CPrintToChat(client, "%s{default} Link for selected demo ({gold}%s{default}):", g_strPrefix, splitArray[11][0]);
-			CPrintToChat(client, "%s {blue}%s/%s.dem", g_strPrefix, splitArray[7][0], splitArray[2][0]);
-			CPrintToChat(client, "%s{default} Start: {yellow}%s{default} | End: {yellow}%s{default} | Player: {yellow}%s", g_strPrefix, splitArray[0][0], splitArray[1][0], splitArray[9][0]);
+			// CPrintToChat(client, "%s{default} Link for selected demo ({gold}%s{default}):", g_strPrefix, splitArray[11][0]);
+			// CPrintToChat(client, "%s {blue}%s/%s.dem", g_strPrefix, splitArray[7][0], splitArray[2][0]);
+			// CPrintToChat(client, "%s{default} Start: {yellow}%s{default} | End: {yellow}%s{default} | Player: {yellow}%s", g_strPrefix, splitArray[0][0], splitArray[1][0], splitArray[9][0]);
 
 			SendSelectedDemoForward(client, splitArray[11][0], StringToInt(splitArray[0][0]), StringToInt(splitArray[1][0]), splitArray[2][0], splitArray[7][0], splitArray[9][0], splitArray[6][0]);
 		}
@@ -720,39 +723,39 @@ stock void deleteDemo(char[] path, char[] name, char[] log)
 	}
 }
 
-stock void createFolders(char[] path1, char[] path2, char[] path3)    // needs rework i think
+stock void createFolders(char[] path1, char[] path2, char[] path3)	  // needs rework i think
 {
 	// *.dem path
 	if (!DirExists(path1))
 	{
 		if (!CreateDirectory(path1, 511))
-			PrintToServer("[Clarity-Demo-Recorder] Failed to create Demo directory: %s", path1);
+			PrintToServer("[SurfTV] Failed to create Demo directory: %s", path1);
 	}
 	else
 	{
-		PrintToServer("[Clarity-Demo-Recorder] Directory already exists: %s", path1);
+		PrintToServer("[SurfTV] Directory already exists: %s", path1);
 	}
 
 	// MapLog path
 	if (!DirExists(path2))
 	{
 		if (!CreateDirectory(path2, 511))
-			PrintToServer("[Clarity-Demo-Recorder] Failed to create MapLog directory: %s", path2);
+			PrintToServer("[SurfTV] Failed to create MapLog directory: %s", path2);
 	}
 	else
 	{
-		PrintToServer("[Clarity-Demo-Recorder] Directory already exists: %s", path2);
+		PrintToServer("[SurfTV] Directory already exists: %s", path2);
 	}
 
 	// Public DL path
 	if (!DirExists(path3))
 	{
 		if (!CreateDirectory(path3, 511))
-			PrintToServer("[Clarity-Demo-Recorder] Failed to create Public DL directory: %s", path3);
+			PrintToServer("[SurfTV] Failed to create Public DL directory: %s", path3);
 	}
 	else
 	{
-		PrintToServer("[Clarity-Demo-Recorder] Directory already exists: %s", path3);
+		PrintToServer("[SurfTV] Directory already exists: %s", path3);
 	}
 }
 
