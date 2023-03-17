@@ -9,7 +9,7 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-#define PLUGIN_VERSION	"0.1"
+#define PLUGIN_VERSION	"0.2"
 
 /*-> Database table name to use for connection <-*/
 #define DB_Name			"wr_demos"
@@ -206,13 +206,37 @@ public void surftimer_OnNewWRCP(int client, int style, char[] time, char[] timeD
 	GetClientAuthId(client, AuthId_SteamID64, playerId, sizeof(playerId));
 
 	Format(wrcpEndTick, sizeof(wrcpEndTick), "%d", currentTick);
-	// Format(wrcpStartTick, sizeof(wrcpStartTick), "%.0f", currentTick - fRunTime * floatTickRate);
-	Format(wrcpStartTick, sizeof(wrcpStartTick), "%.0f", currentTick - fRunTime);
+	Format(wrcpStartTick, sizeof(wrcpStartTick), "%.0f", currentTick - fRunTime * floatTickRate);
+	// Format(wrcpStartTick, sizeof(wrcpStartTick), "%.0f", currentTick - fRunTime);
 	Format(g_strWRLog, sizeof(g_strWRLog), "WRCP %d [%s] | %s by %s --- Time %s --- Improved %s --- StartTick %s --- EndTick %s --- %s", stage, GetStyle(style), g_strMapName, playerName, time, timeDif, wrcpStartTick, wrcpEndTick, g_strDemoName);
 	Format(demoMessage, sizeof(demoMessage), "WRCP %d [%s] | %s by %s --- Time %s --- Improved %s ---", stage, GetStyle(style), g_strMapName, playerName, time, timeDif);
 	SourceTV_PrintToDemoConsole("%s", demoMessage);
 
 	Format(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '0', '%d', NOW(), '0', '%d', '1', '%s', '%s', '%.1f')", DB_Name, playerId, time, wrcpStartTick, wrcpEndTick, g_strDemoName, g_strHostName, stage, style, g_strFastDL, g_strDownloadURL, floatTickRate);
+	db.Query(SQL_ErrorCheckCallback, query);
+
+	populateLog(g_strWRLog);
+	populateMapLog(g_strWRLog);
+}
+
+public void surftimer_OnStageFinished(int client, int style, char[] time, char[] timeDif, int stage, float fRunTime, float fClientRunTime)
+{
+	g_intWRCount		= g_intWRCount + 1;
+	g_intDemoNumber		= g_intDemoNumber + 1;
+	float floatTickRate = GetConVarFloat(gc_ServerTickrate);
+	int	  currentTick	= SourceTV_GetRecordingTick();
+	char  playerName[MAX_NAME_LENGTH], demoMessage[256], wrcpEndTick[64], wrcpStartTick[64], query[1024], playerId[64];
+	GetClientName(client, playerName, sizeof(playerName));
+	GetClientAuthId(client, AuthId_SteamID64, playerId, sizeof(playerId));
+
+	Format(wrcpEndTick, sizeof(wrcpEndTick), "%d", currentTick);
+	// Format(wrcpStartTick, sizeof(wrcpStartTick), "%.0f", currentTick - fRunTime * floatTickRate);
+	Format(wrcpStartTick, sizeof(wrcpStartTick), "%.0f", currentTick - fClientRunTime * floatTickRate);
+	Format(g_strWRLog, sizeof(g_strWRLog), "Stage %d [%s] | %s by %s --- Time %s --- Difference %s --- StartTick %s --- EndTick %s --- %s", stage, GetStyle(style), g_strMapName, playerName, time, timeDif, wrcpStartTick, wrcpEndTick, g_strDemoName);
+	Format(demoMessage, sizeof(demoMessage), "Stage %d [%s] | %s by %s --- Time %s --- Difference %s ---", stage, GetStyle(style), g_strMapName, playerName, time, timeDif);
+	SourceTV_PrintToDemoConsole("%s", demoMessage);
+
+	Format(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '0', '%d', NOW(), '0', '%d', '0', '%s', '%s', '%.1f')", DB_Name, playerId, time, wrcpStartTick, wrcpEndTick, g_strDemoName, g_strHostName, stage, style, g_strFastDL, g_strDownloadURL, floatTickRate);
 	db.Query(SQL_ErrorCheckCallback, query);
 
 	populateLog(g_strWRLog);
