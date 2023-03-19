@@ -207,7 +207,6 @@ public void surftimer_OnNewWRCP(int client, int style, char[] time, char[] timeD
 
 	Format(wrcpEndTick, sizeof(wrcpEndTick), "%d", currentTick);
 	Format(wrcpStartTick, sizeof(wrcpStartTick), "%.0f", currentTick - fRunTime * floatTickRate);
-	// Format(wrcpStartTick, sizeof(wrcpStartTick), "%.0f", currentTick - fRunTime);
 	Format(g_strWRLog, sizeof(g_strWRLog), "WRCP %d [%s] | %s by %s --- Time %s --- Improved %s --- StartTick %s --- EndTick %s --- %s", stage, GetStyle(style), g_strMapName, playerName, time, timeDif, wrcpStartTick, wrcpEndTick, g_strDemoName);
 	Format(demoMessage, sizeof(demoMessage), "WRCP %d [%s] | %s by %s --- Time %s --- Improved %s ---", stage, GetStyle(style), g_strMapName, playerName, time, timeDif);
 	SourceTV_PrintToDemoConsole("%s", demoMessage);
@@ -230,7 +229,6 @@ public void surftimer_OnStageFinished(int client, int style, char[] time, char[]
 	GetClientAuthId(client, AuthId_SteamID64, playerId, sizeof(playerId));
 
 	Format(wrcpEndTick, sizeof(wrcpEndTick), "%d", currentTick);
-	// Format(wrcpStartTick, sizeof(wrcpStartTick), "%.0f", currentTick - fRunTime * floatTickRate);
 	Format(wrcpStartTick, sizeof(wrcpStartTick), "%.0f", currentTick - fClientRunTime * floatTickRate);
 	Format(g_strWRLog, sizeof(g_strWRLog), "Stage %d [%s] | %s by %s --- Time %s --- Difference %s --- StartTick %s --- EndTick %s --- %s", stage, GetStyle(style), g_strMapName, playerName, time, timeDif, wrcpStartTick, wrcpEndTick, g_strDemoName);
 	Format(demoMessage, sizeof(demoMessage), "Stage %d [%s] | %s by %s --- Time %s --- Difference %s ---", stage, GetStyle(style), g_strMapName, playerName, time, timeDif);
