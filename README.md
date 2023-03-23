@@ -10,7 +10,7 @@ Keeps track of all runs made on the server and keeps demos for all **Runs**
   - Logs ALL finishes for the server _(check cfg for path)_
   - Logs ALL finishes for each map _(check cfg for path)_
   - No player left in the server
-    - Saves demo _(check cfg for path)_ or **deletes the recorded demo if no map or bonus was completed**
+    - Saves demo _(check cfg for path)_ or **deletes the recorded demo if no map, bonus or stage was completed**
 
 
 
