@@ -275,13 +275,13 @@ public Action surftimer_OnMapFinished(int client, float fRunTime, char sRunTime[
 	return Plugin_Handled;
 }
 
-public Action surftimer_OnCheckpoint(int client, float fRunTime, char sRunTime[54], float fPbCp, char sPbDiff[16], float fSrCp, char sSrDiff[16])
+public Action surftimer_OnCheckpoint(int client, float fRunTime, char sRunTime[54], float fPbCp, char sPbDiff[16], float fSrCp, char sSrDiff[16], int iCheckpoint)
 {
 	char demoMessage[256], playerName[MAX_NAME_LENGTH], currentTick[32];
 
 	Format(currentTick, sizeof(currentTick), "%d", SourceTV_GetRecordingTick());
 	GetClientName(client, playerName, sizeof(playerName));
-	Format(demoMessage, sizeof(demoMessage), "%s | tick: %s | PB: %s | WR: %s", playerName, currentTick, sPbDiff, sSrDiff);
+	Format(demoMessage, sizeof(demoMessage), "CP %i | %s | tick: %s | PB: %s | WR: %s", iCheckpoint, playerName, currentTick, sPbDiff, sSrDiff);
 
 	SourceTV_PrintToDemoConsole("%s", demoMessage);
 	return Plugin_Handled;
@@ -660,7 +660,6 @@ void Start_Recording()
 		Format(g_strDemoName, sizeof(g_strDemoName), "%s-%s-%d", g_strTime, g_strMapName, g_intDemoNumber);
 		Format(logMsg, sizeof(logMsg), "================================= %s.dem ================================= %s =================================", g_strDemoName, g_strHostName);
 
-		// ServerCommand("mp_warmup_start");
 		ServerCommand("mp_restartgame 1");
 		ServerCommand("tv_record %s/%s", g_strDemoPath, g_strDemoName);
 
