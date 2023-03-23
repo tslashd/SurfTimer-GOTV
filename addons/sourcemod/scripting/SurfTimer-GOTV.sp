@@ -9,7 +9,7 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-#define PLUGIN_VERSION	"0.2"
+#define PLUGIN_VERSION	"0.3"
 
 /*-> Database table name to use for connection <-*/
 #define DB_Name			"wr_demos"
@@ -660,8 +660,8 @@ void Start_Recording()
 		Format(g_strDemoName, sizeof(g_strDemoName), "%s-%s-%d", g_strTime, g_strMapName, g_intDemoNumber);
 		Format(logMsg, sizeof(logMsg), "================================= %s.dem ================================= %s =================================", g_strDemoName, g_strHostName);
 
-		ServerCommand("mp_restartgame 1");
 		ServerCommand("tv_record %s/%s", g_strDemoPath, g_strDemoName);
+		FixRecord();
 
 		populateLog(logMsg);
 		PrintToServer("Started recording - %s", g_strDemoName);
@@ -817,6 +817,19 @@ char[] GetStyle(int style)
 		case 7: strcopy(strStyle, sizeof strStyle, "FS");
 	}
 	return strStyle;
+}
+
+void FixRecord()
+{
+	// For some reasons, demo playback speed is absolute trash without a round_start event.
+	// So whenever the server starts recording a demo, we create the event and fire it.
+	Event e			= CreateEvent("round_start", true);
+	int	  timelimit = FindConVar("mp_timelimit").IntValue;
+	e.SetInt("timelimit", timelimit);
+	e.SetInt("fraglimit", 0);
+	e.SetString("objective", "demofix");
+
+	e.Fire(false);
 }
 
 /* Forwards */
