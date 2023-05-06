@@ -1,63 +1,90 @@
-#include <colorlib>
+#include <colorvariables>
 #include <cstrike>
-#include <filesystem>
 #include <sourcemod>
 #include <sourcetvmanager>
 #include <surftimer>
 #include <unixtime_sourcemod>
+#include <regex>
 
 #pragma semicolon 1
 #pragma newdecls required
 
-#define PLUGIN_VERSION	"0.3"
+#define PLUGIN_VERSION		   "0.3-Enums-And-Transactions"
 
 /*-> Database table name to use for connection <-*/
-#define DB_Name			"wr_demos"
-#define DB_Name_Expired "wr_demos_expired"
+#define DB_Name				   "wr_demos"
+#define DB_Name_Expired		   "wr_demos_expired"
+#define DB_Checkpoints		   "demos_checkpoints"
+#define DB_Checkpoints_Expired "demos_checkpoints_expired"
 /*###############################################*/
 
 /*-> Menus <-*/
-Menu		  menu_main;
-Menu		  submenu_main;
-Menu		  menu_list_demos;
+Menu menu_main;
+Menu submenu_main;
+Menu menu_list_demos;
 
-/*-> DB <-*/
-Database	  db = null;
+/*-> Queries <-*/
+char sql_deleteDemoEntries[]	  = "DELETE FROM %s WHERE DemoName = '%s';";
+char sql_mapFinished[]			  = "UPDATE %s SET MapFinished = '1' WHERE DemoName = '%s';";
+char sql_insertRun[]			  = "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%i', '%i', NOW(), '0', '%i', '%i', '%s', '%s', '%.1f')";
+char sql_insertCheckpoint[]		  = "INSERT INTO %s (steamId, demoName, cp, demoTick, runTime, pbDiff, wrDiff, mapFinished) VALUES ('%s', '%s', %i, %s, '%s', '%s', '%s', 0)";
+char sql_moveExpired[]			  = "INSERT INTO %s (SELECT * FROM %s WHERE `Date` < NOW() - INTERVAL %i DAY);";
+char sql_deleteExpired[]		  = "DELETE FROM %s WHERE `Date` < NOW() - INTERVAL %i DAY;";
+// Create tables
+char sql_createRunsTable[]		  = "CREATE TABLE IF NOT EXISTS `%s` (`SteamId` varchar(64) NOT NULL, `RunTime` text NOT NULL, `StartTick` int NOT NULL, `EndTick` int NOT NULL, `DemoName` text NOT NULL, `Server` text NOT NULL, `Bonus` int NOT NULL, `Stage` int NOT NULL, `Date` datetime NOT NULL DEFAULT NOW(), `MapFinished` int NOT NULL, `Style` int NOT NULL, `IsRecord` int NOT NULL, `FastDL` text NOT NULL, `DownloadURL` text NOT NULL, `Tickrate` double NOT NULL, KEY `SteamId` (`SteamId`));";
+char sql_createCheckpointsTable[] = "CREATE TABLE IF NOT EXISTS `%s` (`steamId` varchar(32) NOT NULL, `demoName` text NOT NULL, `cp` int NOT NULL DEFAULT '0', `demoTick` int NOT NULL, `runTime` varchar(64) NOT NULL, `pbDiff` varchar(64) NULL, `wrDiff` varchar(64) NULL, `mapFinished` int NULL DEFAULT '0', `Date` TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), KEY `steamId` (`steamId`));";
 
-/*-> FORWARDS <-*/
-GlobalForward g_SelectedDemo;
+enum struct CoreData
+{
+	/*-> DB <-*/
+	Database	  db;
 
-/*-> ConVars <-*/
-ConVar		  gc_tvEnabled;
-ConVar		  gc_ServerTickrate;
-ConVar		  gc_LogPath;
-ConVar		  gc_DemoPath;
-ConVar		  gc_HostName;
-ConVar		  gc_MapLogPath;
-ConVar		  gc_FastDL;
-ConVar		  gc_DownloadURL;
-ConVar		  gc_Prefix;
+	/*-> ConVars <-*/
+	ConVar		  cTvEnabled;
+	ConVar		  cTickrate;
+	ConVar		  cLogPath;
+	ConVar		  cDemoPath;
+	ConVar		  cHostname;
+	ConVar		  cMapLogPath;
+	ConVar		  cFastDL;
+	ConVar		  cDownloadURL;
+	ConVar		  cPrefix;
+	ConVar		  cExpireTime;
+
+	char		  DemoPath[PLATFORM_MAX_PATH];
+	char		  FastDL[256];
+	char		  DownloadURL[256];
+	char		  Prefix[256];
+	char		  Hostname[500];
+	char		  Logfile[500];
+	char		  Maplog[500];
+	int			  ExpireTime;
+
+	/*-> FORWARDS <-*/
+	GlobalForward fwSelectedDemo;
+}
+CoreData Core;
+
+enum struct DemoData
+{
+	int	  WRCount;
+	int	  Number;
+	char  DemoName[500];
+	char  InitTime[128];
+	char  Mapname[128];
+	char  PlayerNameWR[MAX_NAME_LENGTH];
+	char  TimeWR[128];
+	float FloatWR;
+	bool  IsRecordWR;
+}
+DemoData	  Demo;
 
 /*-> Global Variables <-*/
 bool		  g_blnMapEnd			= false;
 bool		  g_bIsSurfTimerEnabled = false;
-bool		  g_bIsRecordWR			= false;
 bool		  g_bPersonalDemos[MAXPLAYERS];
-char		  g_strMapName[128];
-char		  g_strDemoName[500];
-char		  g_strDemoPath[PLATFORM_MAX_PATH];
-char		  g_strTime[128];
-char		  g_strLogFile[500];
-char		  g_strMapLog[500];
-char		  g_strWRLog[500];
-char		  g_strHostName[500];
-char		  g_strPlayerWR[MAX_NAME_LENGTH];
-char		  g_strTimeWR[128];
-char		  g_strFastDL[256];
-char		  g_strDownloadURL[256];
-char		  g_strPrefix[256];
-int			  g_intDemoNumber = 0;
-int			  g_intWRCount	  = 0;
+
+char		  g_strWRLog[500];	  // This should be made as a logMsg var in each function
 
 EngineVersion g_EngineVersion;
 
@@ -84,13 +111,14 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 public void OnPluginStart()
 {
-	gc_LogPath		  = CreateConVar("sm_ck_gotv_log", "", "Path to where the log should be stored (addons/sourcemod/logs/_SurfTimer-GOTV.txt)");
-	gc_MapLogPath	  = CreateConVar("sm_ck_gotv_maplogpath", "", "Path to where the log files for each map will be stored without trailing / (.demos/_maps)");
-	gc_DemoPath		  = CreateConVar("sm_ck_gotv_demopath", "", "Path to where the demo files should be stored without trailing / (.demos/Private)");
-	gc_DownloadURL	  = CreateConVar("sm_ck_gotv_downloadurl", "", "URL where the demos recorded from the plugin could be accessed");
-	gc_Prefix		  = CreateConVar("sm_ck_gotv_prefix", "", "Prefix for the plugin");
-	gc_FastDL		  = FindConVar("sv_downloadurl");
-	gc_ServerTickrate = FindConVar("sv_maxupdaterate");
+	Core.cLogPath	  = CreateConVar("sm_ck_gotv_log", "", "Path to where the log should be stored (addons/sourcemod/logs/_SurfTimer-GOTV.txt)");
+	Core.cMapLogPath  = CreateConVar("sm_ck_gotv_maplogpath", "", "Path to where the log files for each map will be stored without trailing / (.demos/_maps)");
+	Core.cDemoPath	  = CreateConVar("sm_ck_gotv_demopath", "", "Path to where the demo files should be stored without trailing / (.demos/Private)");
+	Core.cDownloadURL = CreateConVar("sm_ck_gotv_downloadurl", "", "URL where the demos recorded from the plugin could be accessed");
+	Core.cPrefix	  = CreateConVar("sm_ck_gotv_prefix", "", "Prefix for the plugin");
+	Core.cExpireTime  = CreateConVar("sm_ck_gotv_expire", "7", "Days until db entries are moved to expired and not shown in menu");
+	Core.cFastDL	  = FindConVar("sv_downloadurl");
+	Core.cTickrate	  = FindConVar("sv_maxupdaterate");
 
 	// TEST
 	RegAdminCmd("sm_demos_test", Command_Test, ADMFLAG_ROOT, "Test");
@@ -126,21 +154,21 @@ public void OnLibraryRemoved(const char[] name)
 
 public void OnMapStart()
 {
-	float fRecordTime;
-	g_blnMapEnd	 = false;
-	gc_tvEnabled = FindConVar("tv_enable");
-	if (!gc_tvEnabled.BoolValue)
+	g_blnMapEnd		= false;
+	Core.cTvEnabled = FindConVar("tv_enable");
+	if (!Core.cTvEnabled.BoolValue)
 		SetFailState("GOTV is NOT enabled on this server.");
 
-	surftimer_GetMapData(g_strPlayerWR, g_strTimeWR, fRecordTime);
+	surftimer_GetMapData(Demo.PlayerNameWR, Demo.TimeWR, Demo.FloatWR);
 }
 
 public void OnConfigsExecuted()
 {
-	g_intDemoNumber = 0;
-	g_intWRCount	= 0;
+	Demo.Number	 = 0;
+	Demo.WRCount = 0;
 
-	GetConVarString(gc_Prefix, g_strPrefix, sizeof(g_strPrefix));
+	GetConVarString(Core.cPrefix, Core.Prefix, sizeof(Core.Prefix));
+	Core.ExpireTime = GetConVarInt(Core.cExpireTime);
 }
 
 Action Timer_StartRecording(Handle timer, int client)
@@ -176,43 +204,46 @@ public void OnMapEnd()
 
 public void surftimer_OnNewRecord(int client, int style, char[] time, char[] timeDif, int bonusGroup)
 {
-	g_intWRCount  = g_intWRCount + 1;
-	g_bIsRecordWR = true;
+	Demo.WRCount	= Demo.WRCount + 1;
+	Demo.IsRecordWR = true;
 	char playerName[MAX_NAME_LENGTH], demoMessage[256];
 	GetClientName(client, playerName, sizeof(playerName));
 
 	if (bonusGroup != -1)
 	{
-		Format(g_strWRLog, sizeof(g_strWRLog), "WRB %d [%s] | %s by %s --- Time %s --- Improved %s ---", bonusGroup, GetStyle(style), g_strMapName, playerName, time, timeDif);
-		Format(demoMessage, sizeof(demoMessage), "WRB %d [%s] | %s by %s --- Time %s --- Improved %s ---", bonusGroup, GetStyle(style), g_strMapName, playerName, time, timeDif);
+		FormatEx(g_strWRLog, sizeof(g_strWRLog), "WRB %d [%s] | %s by %s --- Time %s --- Improved %s ---", bonusGroup, GetStyle(style), Demo.Mapname, playerName, time, timeDif);
+		FormatEx(demoMessage, sizeof(demoMessage), "WRB %d [%s] | %s by %s --- Time %s --- Improved %s ---", bonusGroup, GetStyle(style), Demo.Mapname, playerName, time, timeDif);
 		SourceTV_PrintToDemoConsole("%s", demoMessage);
 	}
 	else
 	{
-		Format(g_strWRLog, sizeof(g_strWRLog), "WR [%s] | %s by %s --- Time %s --- Improved %s --- Previous: %s [%s]", GetStyle(style), g_strMapName, playerName, time, timeDif, g_strPlayerWR, g_strTimeWR);
-		Format(demoMessage, sizeof(demoMessage), "WR [%s] | %s by %s --- Time %s --- Improved %s --- Previous: %s [%s]", GetStyle(style), g_strMapName, playerName, time, timeDif, g_strPlayerWR, g_strTimeWR);
+		FormatEx(g_strWRLog, sizeof(g_strWRLog), "WR [%s] | %s by %s --- Time %s --- Improved %s --- Previous: %s [%s]", GetStyle(style), Demo.Mapname, playerName, time, timeDif, Demo.PlayerNameWR, Demo.TimeWR);
+		FormatEx(demoMessage, sizeof(demoMessage), "WR [%s] | %s by %s --- Time %s --- Improved %s --- Previous: %s [%s]", GetStyle(style), Demo.Mapname, playerName, time, timeDif, Demo.PlayerNameWR, Demo.TimeWR);
 		SourceTV_PrintToDemoConsole("%s", demoMessage);
 	}
 }
 
 public void surftimer_OnNewWRCP(int client, int style, char[] time, char[] timeDif, int stage, float fRunTime)
 {
-	g_intWRCount		= g_intWRCount + 1;
-	g_intDemoNumber		= g_intDemoNumber + 1;
-	float floatTickRate = GetConVarFloat(gc_ServerTickrate);
+	Demo.WRCount		= Demo.WRCount + 1;
+	Demo.Number			= Demo.Number + 1;
+	float floatTickRate = GetConVarFloat(Core.cTickrate);
 	int	  currentTick	= SourceTV_GetRecordingTick();
 	char  playerName[MAX_NAME_LENGTH], demoMessage[256], wrcpEndTick[64], wrcpStartTick[64], query[1024], playerId[64];
 	GetClientName(client, playerName, sizeof(playerName));
 	GetClientAuthId(client, AuthId_SteamID64, playerId, sizeof(playerId));
 
-	Format(wrcpEndTick, sizeof(wrcpEndTick), "%d", currentTick);
-	Format(wrcpStartTick, sizeof(wrcpStartTick), "%.0f", currentTick - fRunTime * floatTickRate);
-	Format(g_strWRLog, sizeof(g_strWRLog), "WRCP %d [%s] | %s by %s --- Time %s --- Improved %s --- StartTick %s --- EndTick %s --- %s", stage, GetStyle(style), g_strMapName, playerName, time, timeDif, wrcpStartTick, wrcpEndTick, g_strDemoName);
-	Format(demoMessage, sizeof(demoMessage), "WRCP %d [%s] | %s by %s --- Time %s --- Improved %s ---", stage, GetStyle(style), g_strMapName, playerName, time, timeDif);
+	FormatEx(wrcpEndTick, sizeof(wrcpEndTick), "%d", currentTick);
+	FormatEx(wrcpStartTick, sizeof(wrcpStartTick), "%.0f", currentTick - fRunTime * floatTickRate);
+	FormatEx(g_strWRLog, sizeof(g_strWRLog), "WRCP %d [%s] | %s by %s --- Time %s --- Improved %s --- StartTick %s --- EndTick %s --- %s", stage, GetStyle(style), Demo.Mapname, playerName, time, timeDif, wrcpStartTick, wrcpEndTick, Demo.DemoName);
+	FormatEx(demoMessage, sizeof(demoMessage), "WRCP %d [%s] | %s by %s --- Time %s --- Improved %s ---", stage, GetStyle(style), Demo.Mapname, playerName, time, timeDif);
 	SourceTV_PrintToDemoConsole("%s", demoMessage);
 
-	Format(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '0', '%d', NOW(), '0', '%d', '1', '%s', '%s', '%.1f')", DB_Name, playerId, time, wrcpStartTick, wrcpEndTick, g_strDemoName, g_strHostName, stage, style, g_strFastDL, g_strDownloadURL, floatTickRate);
-	db.Query(SQL_ErrorCheckCallback, query);
+	// FormatEx(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '0', '%d', NOW(), '0', '%d', '1', '%s', '%s', '%.1f')", DB_Name, playerId, time, wrcpStartTick, wrcpEndTick, Demo.DemoName, Core.Hostname, stage, style, Core.FastDL, Core.DownloadURL, floatTickRate);
+	// Core.db.Query(SQL_ErrorCheckCallback, query);
+
+	FormatEx(query, sizeof(query), sql_insertRun, DB_Name, playerId, time, wrcpStartTick, wrcpEndTick, Demo.DemoName, Core.Hostname, 0, stage, style, 1, Core.FastDL, Core.DownloadURL, floatTickRate);
+	Core.db.Query(SQL_ErrorCheckCallback, query);
 
 	populateLog(g_strWRLog);
 	populateMapLog(g_strWRLog);
@@ -220,22 +251,24 @@ public void surftimer_OnNewWRCP(int client, int style, char[] time, char[] timeD
 
 public void surftimer_OnStageFinished(int client, int style, char[] time, char[] timeDif, int stage, float fRunTime, float fClientRunTime)
 {
-	g_intWRCount		= g_intWRCount + 1;
-	g_intDemoNumber		= g_intDemoNumber + 1;
-	float floatTickRate = GetConVarFloat(gc_ServerTickrate);
+	Demo.WRCount		= Demo.WRCount + 1;
+	Demo.Number			= Demo.Number + 1;
+	float floatTickRate = GetConVarFloat(Core.cTickrate);
 	int	  currentTick	= SourceTV_GetRecordingTick();
 	char  playerName[MAX_NAME_LENGTH], demoMessage[256], wrcpEndTick[64], wrcpStartTick[64], query[1024], playerId[64];
 	GetClientName(client, playerName, sizeof(playerName));
 	GetClientAuthId(client, AuthId_SteamID64, playerId, sizeof(playerId));
 
-	Format(wrcpEndTick, sizeof(wrcpEndTick), "%d", currentTick);
-	Format(wrcpStartTick, sizeof(wrcpStartTick), "%.0f", currentTick - fClientRunTime * floatTickRate);
-	Format(g_strWRLog, sizeof(g_strWRLog), "Stage %d [%s] | %s by %s --- Time %s --- Difference %s --- StartTick %s --- EndTick %s --- %s", stage, GetStyle(style), g_strMapName, playerName, time, timeDif, wrcpStartTick, wrcpEndTick, g_strDemoName);
-	Format(demoMessage, sizeof(demoMessage), "Stage %d [%s] | %s by %s --- Time %s --- Difference %s ---", stage, GetStyle(style), g_strMapName, playerName, time, timeDif);
+	FormatEx(wrcpEndTick, sizeof(wrcpEndTick), "%d", currentTick);
+	FormatEx(wrcpStartTick, sizeof(wrcpStartTick), "%.0f", currentTick - fClientRunTime * floatTickRate);
+	FormatEx(g_strWRLog, sizeof(g_strWRLog), "Stage %d [%s] | %s by %s --- Time %s --- Difference %s --- StartTick %s --- EndTick %s --- %s", stage, GetStyle(style), Demo.Mapname, playerName, time, timeDif, wrcpStartTick, wrcpEndTick, Demo.DemoName);
+	FormatEx(demoMessage, sizeof(demoMessage), "Stage %d [%s] | %s by %s --- Time %s --- Difference %s ---", stage, GetStyle(style), Demo.Mapname, playerName, time, timeDif);
 	SourceTV_PrintToDemoConsole("%s", demoMessage);
 
-	Format(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '0', '%d', NOW(), '0', '%d', '0', '%s', '%s', '%.1f')", DB_Name, playerId, time, wrcpStartTick, wrcpEndTick, g_strDemoName, g_strHostName, stage, style, g_strFastDL, g_strDownloadURL, floatTickRate);
-	db.Query(SQL_ErrorCheckCallback, query);
+	// Old query
+	// FormatEx(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '0', '%d', NOW(), '0', '%d', '0', '%s', '%s', '%.1f')", DB_Name, playerId, time, wrcpStartTick, wrcpEndTick, Demo.DemoName, Core.Hostname, stage, style, Core.FastDL, Core.DownloadURL, floatTickRate);
+	FormatEx(query, sizeof(query), sql_insertRun, DB_Name, playerId, time, wrcpStartTick, wrcpEndTick, Demo.DemoName, Core.Hostname, 0, stage, style, 0, Core.FastDL, Core.DownloadURL, floatTickRate);
+	Core.db.Query(SQL_ErrorCheckCallback, query);
 
 	populateLog(g_strWRLog);
 	populateMapLog(g_strWRLog);
@@ -243,33 +276,35 @@ public void surftimer_OnStageFinished(int client, int style, char[] time, char[]
 
 public Action surftimer_OnMapFinished(int client, float fRunTime, char sRunTime[54], float PBDiff, float WRDiff, int rank, int total, int style)
 {
-	g_intDemoNumber		= g_intDemoNumber + 1;
-	float floatTickRate = GetConVarFloat(gc_ServerTickrate);
+	Demo.Number			= Demo.Number + 1;
+	float floatTickRate = GetConVarFloat(Core.cTickrate);
 	int	  currentTick	= SourceTV_GetRecordingTick();
 	char  strStartTick[64], strEndTick[64], strRunTime[64], playerName[MAX_NAME_LENGTH], query[1024], playerId[64];
 	GetClientName(client, playerName, sizeof(playerName));
 	GetClientAuthId(client, AuthId_SteamID64, playerId, sizeof(playerId));
 
 	// Assign runtime, start tick, end tick - Map finished
-	Format(strEndTick, sizeof(strEndTick), "%d", currentTick);
-	Format(strStartTick, sizeof(strStartTick), "%.0f", currentTick - fRunTime * floatTickRate);
-	Format(strRunTime, sizeof(strRunTime), "%.0f", fRunTime);
+	FormatEx(strEndTick, sizeof(strEndTick), "%d", currentTick);
+	FormatEx(strStartTick, sizeof(strStartTick), "%.0f", currentTick - fRunTime * floatTickRate);
+	FormatEx(strRunTime, sizeof(strRunTime), "%.0f", fRunTime);
 
 	// Is this a WR?
-	if (g_bIsRecordWR)
+	if (Demo.IsRecordWR)
 	{
-		g_bIsRecordWR = false;
-		Format(g_strWRLog, sizeof(g_strWRLog), "%s StartTick %s --- EndTick %s --- %s", g_strWRLog, strStartTick, strEndTick, g_strDemoName);
-		populateMapLog(g_strWRLog);
-		Format(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '0', '0', NOW(), '0', '%d', '1', '%s', '%s', '%.1f')", DB_Name, playerId, sRunTime, strStartTick, strEndTick, g_strDemoName, g_strHostName, style, g_strFastDL, g_strDownloadURL, floatTickRate);
-		db.Query(SQL_ErrorCheckCallback, query);
+		// Old query
+		// FormatEx(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '0', '0', NOW(), '0', '%d', '1', '%s', '%s', '%.1f')", DB_Name, playerId, sRunTime, strStartTick, strEndTick, Demo.DemoName, Core.Hostname, style, Core.FastDL, Core.DownloadURL, floatTickRate);
+		Demo.IsRecordWR = false;
+		Format(g_strWRLog, sizeof(g_strWRLog), "%s StartTick %s --- EndTick %s --- %s", g_strWRLog, strStartTick, strEndTick, Demo.DemoName);
+		FormatEx(query, sizeof(query), sql_insertRun, DB_Name, playerId, sRunTime, strStartTick, strEndTick, Demo.DemoName, Core.Hostname, 0, 0, style, 1, Core.FastDL, Core.DownloadURL, floatTickRate);
 	}
 	else
 	{
-		Format(g_strWRLog, sizeof(g_strWRLog), "%s by %s --- Time %s (%d/%d) --- StartTick %s --- EndTick %s --- %s", g_strMapName, playerName, sRunTime, rank, total, strStartTick, strEndTick, g_strDemoName);
-		Format(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '0', '0', NOW(), '0', '%d', '0', '%s', '%s', '%.1f')", DB_Name, playerId, sRunTime, strStartTick, strEndTick, g_strDemoName, g_strHostName, style, g_strFastDL, g_strDownloadURL, floatTickRate);
-		db.Query(SQL_ErrorCheckCallback, query);
+		// Old query
+		// FormatEx(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '0', '0', NOW(), '0', '%d', '0', '%s', '%s', '%.1f')", DB_Name, playerId, sRunTime, strStartTick, strEndTick, Demo.DemoName, Core.Hostname, style, Core.FastDL, Core.DownloadURL, floatTickRate);
+		FormatEx(g_strWRLog, sizeof(g_strWRLog), "%s by %s --- Time %s (%d/%d) --- StartTick %s --- EndTick %s --- %s", Demo.Mapname, playerName, sRunTime, rank, total, strStartTick, strEndTick, Demo.DemoName);
+		FormatEx(query, sizeof(query), sql_insertRun, DB_Name, playerId, sRunTime, strStartTick, strEndTick, Demo.DemoName, Core.Hostname, 0, 0, style, 0, Core.FastDL, Core.DownloadURL, floatTickRate);
 	}
+	Core.db.Query(SQL_ErrorCheckCallback, query);
 
 	populateLog(g_strWRLog);
 	return Plugin_Handled;
@@ -277,11 +312,19 @@ public Action surftimer_OnMapFinished(int client, float fRunTime, char sRunTime[
 
 public Action surftimer_OnCheckpoint(int client, float fRunTime, char sRunTime[54], float fPbCp, char sPbDiff[16], float fSrCp, char sSrDiff[16], int iCheckpoint)
 {
-	char demoMessage[256], playerName[MAX_NAME_LENGTH], currentTick[32];
+	char demoMessage[256], playerName[MAX_NAME_LENGTH], currentTick[32], playerId[64], query[1024];
 
-	Format(currentTick, sizeof(currentTick), "%d", SourceTV_GetRecordingTick());
+	FormatEx(currentTick, sizeof(currentTick), "%d", SourceTV_GetRecordingTick());
 	GetClientName(client, playerName, sizeof(playerName));
-	Format(demoMessage, sizeof(demoMessage), "CP %i | %s | tick: %s | PB: %s | WR: %s", iCheckpoint, playerName, currentTick, sPbDiff, sSrDiff);
+	GetClientAuthId(client, AuthId_SteamID64, playerId, sizeof(playerId));
+
+	// CPrintToChat(client, "iCheckpoint = %i | fRunTime %.1f", iCheckpoint, fRunTime);
+	FormatEx(demoMessage, sizeof(demoMessage), "CP %i | %s | tick: %s | PB: %s | WR: %s", iCheckpoint, playerName, currentTick, sPbDiff, sSrDiff);
+
+	// Old query
+	// FormatEx(query, sizeof(query), "INSERT INTO %s (steamId, demoName, cp, demoTick, runTime, pbDiff, wrDiff, mapFinished) VALUES ('%s', '%s', %i, %s, '%s', '%s', '%s', 0)", DB_Checkpoints, playerId, Demo.DemoName, iCheckpoint, currentTick, sRunTime, sPbDiff, sSrDiff);
+	FormatEx(query, sizeof(query), sql_insertCheckpoint, DB_Checkpoints, playerId, Demo.DemoName, iCheckpoint, currentTick, sRunTime, sPbDiff, sSrDiff);
+	Core.db.Query(SQL_ErrorCheckCallback, query);
 
 	SourceTV_PrintToDemoConsole("%s", demoMessage);
 	return Plugin_Handled;
@@ -289,34 +332,36 @@ public Action surftimer_OnCheckpoint(int client, float fRunTime, char sRunTime[5
 
 public Action surftimer_OnBonusFinished(int client, float fRunTime, char sRunTime[54], float fPBDiff, float fSRDiff, int rank, int total, int bonusid, int style)
 {
-	g_intDemoNumber		= g_intDemoNumber + 1;
+	Demo.Number			= Demo.Number + 1;
 	int	  currentTick	= SourceTV_GetRecordingTick();
-	float floatTickRate = GetConVarFloat(gc_ServerTickrate);
+	float floatTickRate = GetConVarFloat(Core.cTickrate);
 	char  strStartTick[64], strEndTick[64], strRunTime[64], playerName[MAX_NAME_LENGTH], query[1024], playerId[64];
 
 	GetClientName(client, playerName, sizeof(playerName));
 	GetClientAuthId(client, AuthId_SteamID64, playerId, sizeof(playerId));
 
 	// Assign runtime, start tick, end tick - Bonus Finished
-	Format(strEndTick, sizeof(strEndTick), "%d", currentTick);
-	Format(strStartTick, sizeof(strStartTick), "%.0f", currentTick - fRunTime * floatTickRate);
-	Format(strRunTime, sizeof(strRunTime), "%.0f", fRunTime);
+	FormatEx(strEndTick, sizeof(strEndTick), "%d", currentTick);
+	FormatEx(strStartTick, sizeof(strStartTick), "%.0f", currentTick - fRunTime * floatTickRate);
+	FormatEx(strRunTime, sizeof(strRunTime), "%.0f", fRunTime);
 
 	// Is this a WRB?
-	if (g_bIsRecordWR)
+	if (Demo.IsRecordWR)
 	{
-		g_bIsRecordWR = false;
-		Format(g_strWRLog, sizeof(g_strWRLog), "%s StartTick %s --- EndTick %s --- %s", g_strWRLog, strStartTick, strEndTick, g_strDemoName);
-		populateMapLog(g_strWRLog);
-		Format(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%d', '0', NOW(), '0', '%d', '1', '%s', '%s', '%.1f')", DB_Name, playerId, sRunTime, strStartTick, strEndTick, g_strDemoName, g_strHostName, bonusid, style, g_strFastDL, g_strDownloadURL, floatTickRate);
-		db.Query(SQL_ErrorCheckCallback, query);
+		// Old query
+		// FormatEx(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%d', '0', NOW(), '0', '%d', '1', '%s', '%s', '%.1f')", DB_Name, playerId, sRunTime, strStartTick, strEndTick, Demo.DemoName, Core.Hostname, bonusid, style, Core.FastDL, Core.DownloadURL, floatTickRate);
+		Demo.IsRecordWR = false;
+		Format(g_strWRLog, sizeof(g_strWRLog), "%s StartTick %s --- EndTick %s --- %s", g_strWRLog, strStartTick, strEndTick, Demo.DemoName);
+		FormatEx(query, sizeof(query), sql_insertRun, DB_Name, playerId, sRunTime, strStartTick, strEndTick, Demo.DemoName, Core.Hostname, bonusid, 0, style, 1, Core.FastDL, Core.DownloadURL, floatTickRate);
 	}
 	else
 	{
-		Format(g_strWRLog, sizeof(g_strWRLog), "%s [Bonus %d] FINISHED by %s --- Time %s (%d/%d) --- StartTick %s --- EndTick %s --- %s", g_strMapName, bonusid, playerName, sRunTime, rank, total, strStartTick, strEndTick, g_strDemoName);
-		Format(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%d', '0', NOW(), '0', '%d', '0', '%s', '%s', '%.1f')", DB_Name, playerId, sRunTime, strStartTick, strEndTick, g_strDemoName, g_strHostName, bonusid, style, g_strFastDL, g_strDownloadURL, floatTickRate);
-		db.Query(SQL_ErrorCheckCallback, query);
+		// Old query
+		// FormatEx(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%d', '0', NOW(), '0', '%d', '0', '%s', '%s', '%.1f')", DB_Name, playerId, sRunTime, strStartTick, strEndTick, Demo.DemoName, Core.Hostname, bonusid, style, Core.FastDL, Core.DownloadURL, floatTickRate);
+		FormatEx(g_strWRLog, sizeof(g_strWRLog), "%s [Bonus %d] FINISHED by %s --- Time %s (%d/%d) --- StartTick %s --- EndTick %s --- %s", Demo.Mapname, bonusid, playerName, sRunTime, rank, total, strStartTick, strEndTick, Demo.DemoName);
+		FormatEx(query, sizeof(query), sql_insertRun, DB_Name, playerId, sRunTime, strStartTick, strEndTick, Demo.DemoName, Core.Hostname, bonusid, 0, style, 0, Core.FastDL, Core.DownloadURL, floatTickRate);
 	}
+	Core.db.Query(SQL_ErrorCheckCallback, query);
 
 	populateLog(g_strWRLog);
 	return Plugin_Handled;
@@ -324,6 +369,17 @@ public Action surftimer_OnBonusFinished(int client, float fRunTime, char sRunTim
 
 public Action Command_Test(int client, int args)
 {
+	if (args)
+	{
+		char cmdInput[256];
+		GetCmdArg(1, cmdInput, sizeof(cmdInput));
+		PrintToServer(GetMapname(cmdInput));
+	}
+	else
+	{
+		PrintToServer(GetMapname("22_04_23-14_03_13-surf_piano-0 "));
+	}
+
 	return Plugin_Handled;
 }
 
@@ -335,19 +391,26 @@ public void OnDatabaseConnect(Handle owner, Handle hndl, const char[] error, any
 		LogError("[SurfTV] Unable to connect to database (%s)", error);
 		return;
 	}
-	db = view_as<Database>(hndl);	 // Set global DB Handle
+	PrintToServer("[SurfTV] Successfully connected to database!");
 
 	// Create Tables in DB if not exist
-	char query_CreateMainTable[1024], query_CreateExpiredTable[1024];
+	Core.db					 = view_as<Database>(hndl);	   // Set global DB Handle
+	Transaction createTables = SQL_CreateTransaction();
+	char		query[1024];
 
-	FormatEx(query_CreateMainTable, sizeof(query_CreateMainTable), "CREATE TABLE IF NOT EXISTS `%s` (`SteamId` varchar(64) NOT NULL, `RunTime` text NOT NULL, `StartTick` int NOT NULL, `EndTick` int NOT NULL, `DemoName` text NOT NULL, `Server` text NOT NULL, `Bonus` int NOT NULL, `Stage` int NOT NULL, `Date` datetime NOT NULL, `MapFinished` int NOT NULL, `Style` int NOT NULL, `IsRecord` int NOT NULL, `FastDL` text NOT NULL, `DownloadURL` text NOT NULL, `Tickrate` double NOT NULL, KEY `SteamId` (`SteamId`));", DB_Name);
-	db.Query(SQL_ErrorCheckCallback, query_CreateMainTable, DBPrio_High);
+	// Runs
+	FormatEx(query, sizeof(query), sql_createRunsTable, DB_Name);
+	SQL_AddQuery(createTables, query);
+	FormatEx(query, sizeof(query), sql_createRunsTable, DB_Name_Expired);
+	SQL_AddQuery(createTables, query);
 
-	FormatEx(query_CreateExpiredTable, sizeof(query_CreateExpiredTable), "CREATE TABLE IF NOT EXISTS `%s` (`SteamId` varchar(64) NOT NULL, `RunTime` text NOT NULL, `StartTick` int NOT NULL, `EndTick` int NOT NULL, `DemoName` text NOT NULL, `Server` text NOT NULL, `Bonus` int NOT NULL, `Stage` int NOT NULL, `Date` datetime NOT NULL, `MapFinished` int NOT NULL, `Style` int NOT NULL, `IsRecord` int NOT NULL, `FastDL` text NOT NULL, `DownloadURL` text NOT NULL, `Tickrate` double NOT NULL, KEY `SteamId` (`SteamId`));", DB_Name_Expired);
-	db.Query(SQL_ErrorCheckCallback, query_CreateExpiredTable, DBPrio_High);
+	// Checkpoints
+	FormatEx(query, sizeof(query), sql_createCheckpointsTable, DB_Checkpoints);
+	SQL_AddQuery(createTables, query);
+	FormatEx(query, sizeof(query), sql_createCheckpointsTable, DB_Checkpoints_Expired);
+	SQL_AddQuery(createTables, query);
 
-	// Success Print
-	PrintToServer("[SurfTV] Successfully connected to database!");
+	SQL_ExecuteTransaction(Core.db, createTables, SQLTrx_OnSuccess, SQLTrx_OnFailed, 2);
 
 	moveExpired();
 }
@@ -390,7 +453,7 @@ public void SQL_ListSteamids(Handle owner, DBResultSet results, const char[] err
 	if (results == null || strlen(error) > 0)
 	{
 		LogError("[SurfTV] Query failed! %s", error);
-		CPrintToChat(client, "%s Query failed, please try again later.", g_strPrefix);
+		CPrintToChat(client, "%s Query failed, please try again later.", Core.Prefix);
 		return;
 	}
 
@@ -432,21 +495,21 @@ public void SQL_ListSteamids(Handle owner, DBResultSet results, const char[] err
 
 		// Really need a new way of doing this
 		// Don't fix if it ain't broken ig lul
-		Format(itemInfo, sizeof(itemInfo), "%i | %i | %s | %i | %i | %i | %s | %s | %.1f | %s | %s | %s", StartTick, EndTick, DemoName, Bonus, Stage, IsRecord, FastDL, DownloadURL, Tickrate, SteamId, temp, RunTime);
+		FormatEx(itemInfo, sizeof(itemInfo), "%i | %i | %s | %i | %i | %i | %s | %s | %.1f | %s | %s | %s", StartTick, EndTick, DemoName, Bonus, Stage, IsRecord, FastDL, DownloadURL, Tickrate, SteamId, temp, RunTime);
 		if (Bonus > 0)
 		{
-			Format(buff, sizeof(buff), "[%s] Bonus: %i (%s)", GetStyle(Style), Bonus, RunTime);
-			Format(itemName, sizeof(itemName), "surf_%s\n%s", temp, buff);
+			FormatEx(buff, sizeof(buff), "[%s] Bonus: %i (%s)", GetStyle(Style), Bonus, RunTime);
+			FormatEx(itemName, sizeof(itemName), "surf_%s\n%s", temp, buff);
 		}
 		else if (Stage > 0)
 		{
-			Format(buff, sizeof(buff), "[%s] Stage: %i (%s)", GetStyle(Style), Stage, RunTime);
-			Format(itemName, sizeof(itemName), "surf_%s\n%s", temp, buff);
+			FormatEx(buff, sizeof(buff), "[%s] Stage: %i (%s)", GetStyle(Style), Stage, RunTime);
+			FormatEx(itemName, sizeof(itemName), "surf_%s\n%s", temp, buff);
 		}
 		else if (Bonus == 0 && Stage == 0)
 		{
-			Format(buff, sizeof(buff), "[%s] %s (%s)", GetStyle(Style), RunTime, szDate);
-			Format(itemName, sizeof(itemName), "surf_%s\n%s", temp, buff);
+			FormatEx(buff, sizeof(buff), "[%s] %s (%s)", GetStyle(Style), RunTime, szDate);
+			FormatEx(itemName, sizeof(itemName), "surf_%s\n%s", temp, buff);
 		}
 		menu_list_demos.AddItem(itemInfo, itemName, ITEMDRAW_CONTROL);
 	}
@@ -539,15 +602,15 @@ public int Sub_Menu_Callback(Menu menu, MenuAction action, int client, int param
 			switch (param2)
 			{
 				case 0:
-					FormatEx(query, sizeof(query), "%s AND Bonus = 0 AND Stage = 0 AND MapFinished = 1 ORDER BY Date DESC;", query);
+					Format(query, sizeof(query), "%s AND Bonus = 0 AND Stage = 0 AND MapFinished = 1 ORDER BY Date DESC;", query);
 				case 1:
-					FormatEx(query, sizeof(query), "%s AND Bonus = 0 AND Stage > 0 AND MapFinished = 1 ORDER BY Date DESC;", query);
+					Format(query, sizeof(query), "%s AND Bonus = 0 AND Stage > 0 AND MapFinished = 1 ORDER BY Date DESC;", query);
 				case 2:
-					FormatEx(query, sizeof(query), "%s AND Bonus > 0 AND Stage = 0 AND MapFinished = 1 ORDER BY Date DESC;", query);
+					Format(query, sizeof(query), "%s AND Bonus > 0 AND Stage = 0 AND MapFinished = 1 ORDER BY Date DESC;", query);
 			}
 
 			// CPrintToChat(client, "{blue}[Sub-Menu]{default} Query: {yellow}%s", query);
-			db.Query(SQL_ListSteamids, query, GetClientUserId(client), DBPrio_Normal);
+			Core.db.Query(SQL_ListSteamids, query, GetClientUserId(client), DBPrio_Normal);
 		}
 		case MenuAction_Cancel:
 		{
@@ -611,10 +674,11 @@ public int Menu_Callback(Menu menu, MenuAction action, int client, int param2)
 				demoRunTime = splitArray[11][0]
 			*/
 			ExplodeString(info, " | ", splitArray, sizeof(splitArray), sizeof(splitArray));
+			// PrintToServer(info);
 
-			// CPrintToChat(client, "%s{default} Link for selected demo ({gold}%s{default}):", g_strPrefix, splitArray[11][0]);
-			// CPrintToChat(client, "%s {blue}%s/%s.dem", g_strPrefix, splitArray[7][0], splitArray[2][0]);
-			// CPrintToChat(client, "%s{default} Start: {yellow}%s{default} | End: {yellow}%s{default} | Player: {yellow}%s", g_strPrefix, splitArray[0][0], splitArray[1][0], splitArray[9][0]);
+			// CPrintToChat(client, "%s{default} Link for selected demo ({gold}%s{default}):", Prefix, splitArray[11][0]);
+			// CPrintToChat(client, "%s {blue}%s/%s.dem", Prefix, splitArray[7][0], splitArray[2][0]);
+			// CPrintToChat(client, "%s{default} Start: {yellow}%s{default} | End: {yellow}%s{default} | Player: {yellow}%s", Prefix, splitArray[0][0], splitArray[1][0], splitArray[9][0]);
 
 			SendSelectedDemoForward(client, splitArray[11][0], StringToInt(splitArray[0][0]), StringToInt(splitArray[1][0]), splitArray[2][0], splitArray[7][0], splitArray[9][0], splitArray[6][0]);
 		}
@@ -641,37 +705,37 @@ public int Menu_Callback(Menu menu, MenuAction action, int client, int param2)
 /* Funcs */
 void Start_Recording()
 {
-	gc_HostName = FindConVar("hostname");
+	Core.cHostname = FindConVar("hostname");
 
-	GetConVarString(gc_MapLogPath, g_strMapLog, sizeof(g_strMapLog));
-	GetConVarString(gc_DemoPath, g_strDemoPath, sizeof(g_strDemoPath));
-	GetConVarString(gc_LogPath, g_strLogFile, sizeof(g_strLogFile));
-	GetConVarString(gc_HostName, g_strHostName, sizeof(g_strHostName));
-	GetConVarString(gc_FastDL, g_strFastDL, sizeof(g_strFastDL));
-	GetConVarString(gc_DownloadURL, g_strDownloadURL, sizeof(g_strDownloadURL));
-	GetCurrentMap(g_strMapName, sizeof(g_strMapName));
+	GetConVarString(Core.cMapLogPath, Core.Maplog, sizeof(Core.Maplog));
+	GetConVarString(Core.cDemoPath, Core.DemoPath, sizeof(Core.DemoPath));
+	GetConVarString(Core.cLogPath, Core.Logfile, sizeof(Core.Logfile));
+	GetConVarString(Core.cHostname, Core.Hostname, sizeof(Core.Hostname));
+	GetConVarString(Core.cFastDL, Core.FastDL, sizeof(Core.FastDL));
+	GetConVarString(Core.cDownloadURL, Core.DownloadURL, sizeof(Core.DownloadURL));
+	GetCurrentMap(Demo.Mapname, sizeof(Demo.Mapname));
 
-	// createFolders(g_strDemoPath, g_strMapLog, g_strDownloadFolder);
+	// createFolders(Core.DemoPath, Core.Maplog, g_strDownloadFolder);
 
 	if (!SourceTV_IsRecording())
 	{
 		char logMsg[1000];
-		FormatTime(g_strTime, sizeof(g_strTime), "%d_%m_%y-%H_%M_%S", GetTime());
-		Format(g_strDemoName, sizeof(g_strDemoName), "%s-%s-%d", g_strTime, g_strMapName, g_intDemoNumber);
-		Format(logMsg, sizeof(logMsg), "================================= %s.dem ================================= %s =================================", g_strDemoName, g_strHostName);
+		FormatTime(Demo.InitTime, sizeof(Demo.InitTime), "%d_%m_%y-%H_%M_%S", GetTime());
+		FormatEx(Demo.DemoName, sizeof(Demo.DemoName), "%s-%s-%d", Demo.InitTime, Demo.Mapname, Demo.Number);
+		FormatEx(logMsg, sizeof(logMsg), "================================= %s.dem ================================= %s =================================", Demo.DemoName, Core.Hostname);
 
-		ServerCommand("tv_record %s/%s", g_strDemoPath, g_strDemoName);
+		ServerCommand("tv_record %s/%s", Core.DemoPath, Demo.DemoName);
 		FixRecord();
 
 		populateLog(logMsg);
-		PrintToServer("Started recording - %s", g_strDemoName);
+		PrintToServer("Started recording - %s", Demo.DemoName);
 	}
 }
 
 void Stop_Recording()
 {
 	char logMsg[256];
-	Format(logMsg, sizeof(logMsg), "Total replays for %s : %d", g_strMapName, g_intDemoNumber);
+	FormatEx(logMsg, sizeof(logMsg), "Total replays for %s : %d", Demo.Mapname, Demo.Number);
 
 	ServerCommand("tv_stoprecord");
 	populateLog(logMsg);
@@ -679,8 +743,8 @@ void Stop_Recording()
 	// Update all entries from current map in DB as MapFinished = 1
 	updateEntries();
 
-	if (g_intDemoNumber <= 0)
-		deleteDemo(g_strDemoPath, g_strDemoName, g_strLogFile);
+	if (Demo.Number <= 0)
+		deleteDemo(Core.DemoPath, Demo.DemoName, Core.Logfile);
 }
 
 int GetRealClientCount()
@@ -700,20 +764,20 @@ int GetRealClientCount()
 
 stock void populateLog(char[] message)
 {
-	if (strlen(g_strLogFile) > 0)
-		LogToFileEx(g_strLogFile, "%s", message);
+	if (strlen(Core.Logfile) > 0)
+		LogToFileEx(Core.Logfile, "%s", message);
 }
 
 stock void populateMapLog(char[] message)
 {
-	if (strlen(g_strMapLog) > 0)
+	if (strlen(Core.Maplog) > 0)
 	{
-		if (StrEqual(g_strHostName, ""))
-			GetConVarString(gc_HostName, g_strHostName, sizeof(g_strHostName));
+		if (StrEqual(Core.Hostname, ""))
+			GetConVarString(Core.cHostname, Core.Hostname, sizeof(Core.Hostname));
 
 		char szPath[500];
-		Format(szPath, sizeof(szPath), "%s/%s.txt", g_strMapLog, g_strMapName);
-		LogToFileEx(szPath, "%s --- %s", message, g_strHostName);
+		FormatEx(szPath, sizeof(szPath), "%s/%s.txt", Core.Maplog, Demo.Mapname);
+		LogToFileEx(szPath, "%s --- %s", message, Core.Hostname);
 	}
 }
 
@@ -723,23 +787,23 @@ stock void deleteDemo(char[] path, char[] name, char[] log)
 	if (DirExists(path))
 	{
 		char szPath[500];
-		Format(szPath, sizeof(szPath), "%s/%s.dem", path, name);
+		FormatEx(szPath, sizeof(szPath), "%s/%s.dem", path, name);
 
 		if (FileExists(szPath))
 		{
 			DeleteFile(szPath);
-			Format(logMsg, sizeof(logMsg), "Demo deleted - %s", szPath);
+			FormatEx(logMsg, sizeof(logMsg), "Demo deleted - %s", szPath);
 			populateLog(logMsg);
 		}
 		else
 		{
-			Format(logMsg, sizeof(logMsg), "Demo does NOT exist - %s", szPath);
+			FormatEx(logMsg, sizeof(logMsg), "Demo does NOT exist - %s", szPath);
 			populateLog(logMsg);
 		}
 	}
 	else
 	{
-		Format(logMsg, sizeof(logMsg), "Dir does NOT exist - %s", path);
+		FormatEx(logMsg, sizeof(logMsg), "Dir does NOT exist - %s", path);
 		populateLog(logMsg);
 	}
 }
@@ -782,24 +846,103 @@ stock void createFolders(char[] path1, char[] path2, char[] path3)	  // needs re
 
 void updateEntries()
 {
-	char query[256];
-	Format(query, sizeof(query), "UPDATE %s SET MapFinished = '1' WHERE DemoName = '%s';", DB_Name, g_strDemoName);
-	db.Query(SQL_ErrorCheckCallback, query, DBPrio_Normal);
+	Transaction updateTrx = SQL_CreateTransaction();
+	char		query[1024];
+
+	if (Demo.Number <= 0)
+	{
+		// Delete runs
+		FormatEx(query, sizeof(query), sql_deleteDemoEntries, DB_Name, Demo.DemoName);
+		SQL_AddQuery(updateTrx, query);
+
+		// Delete checkpoints
+		FormatEx(query, sizeof(query), sql_deleteDemoEntries, DB_Checkpoints, Demo.DemoName);
+		SQL_AddQuery(updateTrx, query);
+	}
+	else
+	{
+		// Update runs
+		FormatEx(query, sizeof(query), sql_mapFinished, DB_Name, Demo.DemoName);
+		SQL_AddQuery(updateTrx, query);
+
+		// Update checkpoints
+		FormatEx(query, sizeof(query), sql_mapFinished, DB_Checkpoints, Demo.DemoName);
+		SQL_AddQuery(updateTrx, query);
+	}
+
+	SQL_ExecuteTransaction(Core.db, updateTrx, SQLTrx_OnSuccess, SQLTrx_OnFailed, 1);
 }
 
 void moveExpired()
 {
-	char query_MoveExpired[512], query_DeleteExpired[512];
+	Transaction expired = SQL_CreateTransaction();
+	char		query[1024];
 
-	// Copy all expired entries to expired table
-	FormatEx(query_MoveExpired, sizeof(query_MoveExpired), "INSERT INTO %s (SELECT * FROM %s WHERE `Date` < NOW() - INTERVAL 7 DAY)", DB_Name_Expired, DB_Name);
-	db.Query(SQL_ErrorCheckCallback, query_MoveExpired, _, DBPrio_Normal);
+	// Old queries
+	// FormatEx(query_MoveExpired, sizeof(query_MoveExpired), "INSERT INTO %s (SELECT * FROM %s WHERE `Date` < NOW() - INTERVAL %i DAY);", DB_Name_Expired, DB_Name, Core.ExpireTime);
+	// FormatEx(query_DeleteExpired, sizeof(query_DeleteExpired), "DELETE FROM %s WHERE `Date` < NOW() - INTERVAL %i DAY;", DB_Name, Core.ExpireTime);
 
-	// Delete all expired entries from main table
-	FormatEx(query_DeleteExpired, sizeof(query_DeleteExpired), "DELETE FROM %s WHERE `Date` < NOW() - INTERVAL 7 DAY;", DB_Name);
-	db.Query(SQL_ErrorCheckCallback, query_DeleteExpired, _, DBPrio_Normal);
+	// Copy all expired runs to expired table
+	FormatEx(query, sizeof(query), sql_moveExpired, DB_Name_Expired, DB_Name, Core.ExpireTime);
+	SQL_AddQuery(expired, query);
+	// Delete all expired runs from main table
+	FormatEx(query, sizeof(query), sql_deleteExpired, DB_Name, Core.ExpireTime);
+	SQL_AddQuery(expired, query);
 
-	PrintToServer("[SurfTV] Successfully moved expired entries!");
+	// Old queries
+	// FormatEx(query_MoveExpired, sizeof(query_MoveExpired), "INSERT INTO %s (SELECT * FROM %s WHERE `timestamp` < NOW() - INTERVAL %i DAY);", DB_Checkpoints_Expired, DB_Checkpoints, Core.ExpireTime);
+	// FormatEx(query_DeleteExpired, sizeof(query_DeleteExpired), "DELETE FROM %s WHERE `timestamp` < NOW() - INTERVAL %i DAY;", DB_Checkpoints, Core.ExpireTime);
+
+	// Copy checkpoints to expired
+	FormatEx(query, sizeof(query), sql_moveExpired, DB_Checkpoints_Expired, DB_Checkpoints, Core.ExpireTime);
+	SQL_AddQuery(expired, query);
+	// Delete checkpoints from main
+	FormatEx(query, sizeof(query), sql_deleteExpired, DB_Checkpoints, Core.ExpireTime);
+	SQL_AddQuery(expired, query);
+
+	SQL_ExecuteTransaction(Core.db, expired, SQLTrx_OnSuccess, SQLTrx_OnFailed, 0);
+}
+
+public void SQLTrx_OnSuccess(Handle db, any data, int numQueries, Handle[] results, any[] queryData)
+{
+	switch (data)
+	{
+		case 0: PrintToServer("[SurfTV] Successfully moved expired entries! (%i days)", Core.ExpireTime);
+		case 1: PrintToServer("[SurfTV] Successfully updated entries!");
+		case 2: PrintToServer("[SurfTV] Successfully created tables!");
+	}
+}
+
+public void SQLTrx_OnFailed(Handle db, any data, int numQueries, const char[] error, int failIndex, any[] queryData)
+{
+	switch (data)
+	{
+		case 0: LogError("[SurfTV] Failed moving expired entries! (%i days)", Core.ExpireTime);
+		case 1: LogError("[SurfTV] Failed updating entries!");
+		case 2: LogError("[SurfTV] Failed to create tables!");
+	}
+
+	SetFailState("[SurfTV] Transaction failed! Queries: %i (Case: %i)", numQueries, data);
+}
+
+char[] GetMapname(char[] demoName)
+{
+	char  regex_expression[] = "\\d{2}_\\d{2}_\\d{2}-\\d{2}_\\d{2}_\\d{2}-(surf_[a-zA-Z0-9_]+)-\\d";
+	char  regex_match[512];
+
+	Regex rr = CompileRegex(regex_expression);
+	if (MatchRegex(rr, demoName) != -1)
+	{
+		GetRegexSubString(rr, 1, regex_match, sizeof regex_match);
+		// PrintToServer("Matched string: %s", regex_match);
+	}
+	else
+	{
+		PrintToServer("No match found.");
+	}
+
+	delete rr;
+	return regex_match;
 }
 
 char[] GetStyle(int style)
@@ -835,7 +978,7 @@ void FixRecord()
 /* Forwards */
 void InitForwards()
 {
-	g_SelectedDemo = new GlobalForward("SurfTV_SelectedDemo", ET_Event, Param_Cell, Param_String, Param_Cell, Param_Cell, Param_String, Param_String, Param_String, Param_String);
+	Core.fwSelectedDemo = new GlobalForward("SurfTV_SelectedDemo", ET_Event, Param_Cell, Param_String, Param_Cell, Param_Cell, Param_String, Param_String, Param_String, Param_String);
 }
 
 /*
@@ -853,7 +996,7 @@ void InitForwards()
 void SendSelectedDemoForward(int client, const char[] demoRunTime, int demoStart, int demoEnd, const char[] demoName, const char[] dlUrl, const char[] demoPlayer, const char[] demoFdl)
 {
 	/* Start function call */
-	Call_StartForward(g_SelectedDemo);
+	Call_StartForward(Core.fwSelectedDemo);
 
 	/* Push parameters one at a time */
 	Call_PushCell(client);
