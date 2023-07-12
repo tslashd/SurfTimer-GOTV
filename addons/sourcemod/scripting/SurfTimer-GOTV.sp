@@ -202,7 +202,7 @@ public void OnMapEnd()
 	if (SourceTV_IsRecording()) Stop_Recording();
 }
 
-public void surftimer_OnNewRecord(int client, int style, char[] time, char[] timeDif, int bonusGroup)
+public void surftimer_OnNewRecord(int client, int style, char[] time, char[] timeDif, int bonusGroup, ArrayList checkpoints)
 {
 	Demo.WRCount	= Demo.WRCount + 1;
 	Demo.IsRecordWR = true;
@@ -274,7 +274,7 @@ public void surftimer_OnStageFinished(int client, int style, char[] time, char[]
 	populateMapLog(g_strWRLog);
 }
 
-public Action surftimer_OnMapFinished(int client, float fRunTime, char sRunTime[54], float PBDiff, float WRDiff, int rank, int total, int style)
+public Action surftimer_OnMapFinished(int client, float fRunTime, char sRunTime[54], float PBDiff, float WRDiff, int rank, int total, int style, ArrayList checkpoints)
 {
 	Demo.Number			= Demo.Number + 1;
 	float floatTickRate = GetConVarFloat(Core.cTickrate);
