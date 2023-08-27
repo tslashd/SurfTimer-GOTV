@@ -127,7 +127,7 @@ public void OnPluginStart()
 	RegConsoleCmd("sm_admin_demos", Menu_Command, "List all demos available for client");
 	RegConsoleCmd("sm_wrdemos", Menu_Command, "List all demos available for client");
 
-	CreateConVar("sm_demorecorder_version", PLUGIN_VERSION, "Standard plugin version ConVar. Please don't change me!", FCVAR_REPLICATED | FCVAR_NOTIFY | FCVAR_DONTRECORD);
+	// CreateConVar("sm_demorecorder_version", PLUGIN_VERSION, "Standard plugin version ConVar. Please don't change me!", FCVAR_REPLICATED | FCVAR_NOTIFY | FCVAR_DONTRECORD);
 
 	AutoExecConfig(true, "SurfTimer-GOTV");
 	InitForwards();
@@ -229,7 +229,7 @@ public void surftimer_OnNewWRCP(int client, int style, char[] time, char[] timeD
 	Demo.Number			= Demo.Number + 1;
 	float floatTickRate = GetConVarFloat(Core.cTickrate);
 	int	  currentTick	= SourceTV_GetRecordingTick();
-	char  playerName[MAX_NAME_LENGTH], demoMessage[256], wrcpEndTick[64], wrcpStartTick[64], query[1024], playerId[64];
+	char  playerName[MAX_NAME_LENGTH], demoMessage[256], wrcpEndTick[64], wrcpStartTick[64], query[2048], playerId[64];
 	GetClientName(client, playerName, sizeof(playerName));
 	GetClientAuthId(client, AuthId_SteamID64, playerId, sizeof(playerId));
 
@@ -238,9 +238,6 @@ public void surftimer_OnNewWRCP(int client, int style, char[] time, char[] timeD
 	FormatEx(g_strWRLog, sizeof(g_strWRLog), "WRCP %d [%s] | %s by %s --- Time %s --- Improved %s --- StartTick %s --- EndTick %s --- %s", stage, GetStyle(style), Demo.Mapname, playerName, time, timeDif, wrcpStartTick, wrcpEndTick, Demo.DemoName);
 	FormatEx(demoMessage, sizeof(demoMessage), "WRCP %d [%s] | %s by %s --- Time %s --- Improved %s ---", stage, GetStyle(style), Demo.Mapname, playerName, time, timeDif);
 	SourceTV_PrintToDemoConsole("%s", demoMessage);
-
-	// FormatEx(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '0', '%d', NOW(), '0', '%d', '1', '%s', '%s', '%.1f')", DB_Name, playerId, time, wrcpStartTick, wrcpEndTick, Demo.DemoName, Core.Hostname, stage, style, Core.FastDL, Core.DownloadURL, floatTickRate);
-	// Core.db.Query(SQL_ErrorCheckCallback, query);
 
 	FormatEx(query, sizeof(query), sql_insertRun, DB_Name, playerId, time, wrcpStartTick, wrcpEndTick, Demo.DemoName, Core.Hostname, 0, stage, style, 1, Core.FastDL, Core.DownloadURL, floatTickRate);
 	Core.db.Query(SQL_ErrorCheckCallback, query);
@@ -255,7 +252,7 @@ public void surftimer_OnStageFinished(int client, int style, char[] time, char[]
 	Demo.Number			= Demo.Number + 1;
 	float floatTickRate = GetConVarFloat(Core.cTickrate);
 	int	  currentTick	= SourceTV_GetRecordingTick();
-	char  playerName[MAX_NAME_LENGTH], demoMessage[256], wrcpEndTick[64], wrcpStartTick[64], query[1024], playerId[64];
+	char  playerName[MAX_NAME_LENGTH], demoMessage[256], wrcpEndTick[64], wrcpStartTick[64], query[2048], playerId[64];
 	GetClientName(client, playerName, sizeof(playerName));
 	GetClientAuthId(client, AuthId_SteamID64, playerId, sizeof(playerId));
 
@@ -265,8 +262,6 @@ public void surftimer_OnStageFinished(int client, int style, char[] time, char[]
 	FormatEx(demoMessage, sizeof(demoMessage), "Stage %d [%s] | %s by %s --- Time %s --- Difference %s ---", stage, GetStyle(style), Demo.Mapname, playerName, time, timeDif);
 	SourceTV_PrintToDemoConsole("%s", demoMessage);
 
-	// Old query
-	// FormatEx(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '0', '%d', NOW(), '0', '%d', '0', '%s', '%s', '%.1f')", DB_Name, playerId, time, wrcpStartTick, wrcpEndTick, Demo.DemoName, Core.Hostname, stage, style, Core.FastDL, Core.DownloadURL, floatTickRate);
 	FormatEx(query, sizeof(query), sql_insertRun, DB_Name, playerId, time, wrcpStartTick, wrcpEndTick, Demo.DemoName, Core.Hostname, 0, stage, style, 0, Core.FastDL, Core.DownloadURL, floatTickRate);
 	Core.db.Query(SQL_ErrorCheckCallback, query);
 
@@ -279,7 +274,7 @@ public Action surftimer_OnMapFinished(int client, float fRunTime, char sRunTime[
 	Demo.Number			= Demo.Number + 1;
 	float floatTickRate = GetConVarFloat(Core.cTickrate);
 	int	  currentTick	= SourceTV_GetRecordingTick();
-	char  strStartTick[64], strEndTick[64], strRunTime[64], playerName[MAX_NAME_LENGTH], query[1024], playerId[64];
+	char  strStartTick[64], strEndTick[64], strRunTime[64], playerName[MAX_NAME_LENGTH], query[2048], playerId[64];
 	GetClientName(client, playerName, sizeof(playerName));
 	GetClientAuthId(client, AuthId_SteamID64, playerId, sizeof(playerId));
 
@@ -291,16 +286,12 @@ public Action surftimer_OnMapFinished(int client, float fRunTime, char sRunTime[
 	// Is this a WR?
 	if (Demo.IsRecordWR)
 	{
-		// Old query
-		// FormatEx(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '0', '0', NOW(), '0', '%d', '1', '%s', '%s', '%.1f')", DB_Name, playerId, sRunTime, strStartTick, strEndTick, Demo.DemoName, Core.Hostname, style, Core.FastDL, Core.DownloadURL, floatTickRate);
 		Demo.IsRecordWR = false;
 		Format(g_strWRLog, sizeof(g_strWRLog), "%s StartTick %s --- EndTick %s --- %s", g_strWRLog, strStartTick, strEndTick, Demo.DemoName);
 		FormatEx(query, sizeof(query), sql_insertRun, DB_Name, playerId, sRunTime, strStartTick, strEndTick, Demo.DemoName, Core.Hostname, 0, 0, style, 1, Core.FastDL, Core.DownloadURL, floatTickRate);
 	}
 	else
 	{
-		// Old query
-		// FormatEx(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '0', '0', NOW(), '0', '%d', '0', '%s', '%s', '%.1f')", DB_Name, playerId, sRunTime, strStartTick, strEndTick, Demo.DemoName, Core.Hostname, style, Core.FastDL, Core.DownloadURL, floatTickRate);
 		FormatEx(g_strWRLog, sizeof(g_strWRLog), "%s by %s --- Time %s (%d/%d) --- StartTick %s --- EndTick %s --- %s", Demo.Mapname, playerName, sRunTime, rank, total, strStartTick, strEndTick, Demo.DemoName);
 		FormatEx(query, sizeof(query), sql_insertRun, DB_Name, playerId, sRunTime, strStartTick, strEndTick, Demo.DemoName, Core.Hostname, 0, 0, style, 0, Core.FastDL, Core.DownloadURL, floatTickRate);
 	}
@@ -312,7 +303,7 @@ public Action surftimer_OnMapFinished(int client, float fRunTime, char sRunTime[
 
 public Action surftimer_OnCheckpoint(int client, float fRunTime, char sRunTime[54], float fPbCp, char sPbDiff[16], float fSrCp, char sSrDiff[16], int iCheckpoint)
 {
-	char demoMessage[256], playerName[MAX_NAME_LENGTH], currentTick[32], playerId[64], query[1024];
+	char demoMessage[256], playerName[MAX_NAME_LENGTH], currentTick[32], playerId[64], query[2048];
 
 	FormatEx(currentTick, sizeof(currentTick), "%d", SourceTV_GetRecordingTick());
 	GetClientName(client, playerName, sizeof(playerName));
@@ -321,8 +312,6 @@ public Action surftimer_OnCheckpoint(int client, float fRunTime, char sRunTime[5
 	// CPrintToChat(client, "iCheckpoint = %i | fRunTime %.1f", iCheckpoint, fRunTime);
 	FormatEx(demoMessage, sizeof(demoMessage), "CP %i | %s | tick: %s | PB: %s | WR: %s", iCheckpoint, playerName, currentTick, sPbDiff, sSrDiff);
 
-	// Old query
-	// FormatEx(query, sizeof(query), "INSERT INTO %s (steamId, demoName, cp, demoTick, runTime, pbDiff, wrDiff, mapFinished) VALUES ('%s', '%s', %i, %s, '%s', '%s', '%s', 0)", DB_Checkpoints, playerId, Demo.DemoName, iCheckpoint, currentTick, sRunTime, sPbDiff, sSrDiff);
 	FormatEx(query, sizeof(query), sql_insertCheckpoint, DB_Checkpoints, playerId, Demo.DemoName, iCheckpoint, currentTick, sRunTime, sPbDiff, sSrDiff);
 	Core.db.Query(SQL_ErrorCheckCallback, query);
 
@@ -335,7 +324,7 @@ public Action surftimer_OnBonusFinished(int client, float fRunTime, char sRunTim
 	Demo.Number			= Demo.Number + 1;
 	int	  currentTick	= SourceTV_GetRecordingTick();
 	float floatTickRate = GetConVarFloat(Core.cTickrate);
-	char  strStartTick[64], strEndTick[64], strRunTime[64], playerName[MAX_NAME_LENGTH], query[1024], playerId[64];
+	char  strStartTick[64], strEndTick[64], strRunTime[64], playerName[MAX_NAME_LENGTH], query[2048], playerId[64];
 
 	GetClientName(client, playerName, sizeof(playerName));
 	GetClientAuthId(client, AuthId_SteamID64, playerId, sizeof(playerId));
@@ -348,16 +337,12 @@ public Action surftimer_OnBonusFinished(int client, float fRunTime, char sRunTim
 	// Is this a WRB?
 	if (Demo.IsRecordWR)
 	{
-		// Old query
-		// FormatEx(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%d', '0', NOW(), '0', '%d', '1', '%s', '%s', '%.1f')", DB_Name, playerId, sRunTime, strStartTick, strEndTick, Demo.DemoName, Core.Hostname, bonusid, style, Core.FastDL, Core.DownloadURL, floatTickRate);
 		Demo.IsRecordWR = false;
 		Format(g_strWRLog, sizeof(g_strWRLog), "%s StartTick %s --- EndTick %s --- %s", g_strWRLog, strStartTick, strEndTick, Demo.DemoName);
 		FormatEx(query, sizeof(query), sql_insertRun, DB_Name, playerId, sRunTime, strStartTick, strEndTick, Demo.DemoName, Core.Hostname, bonusid, 0, style, 1, Core.FastDL, Core.DownloadURL, floatTickRate);
 	}
 	else
 	{
-		// Old query
-		// FormatEx(query, sizeof(query), "INSERT INTO %s (SteamId, RunTime, StartTick, EndTick, DemoName, Server, Bonus, Stage, Date, MapFinished, Style, IsRecord, FastDL, DownloadURL, Tickrate) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%d', '0', NOW(), '0', '%d', '0', '%s', '%s', '%.1f')", DB_Name, playerId, sRunTime, strStartTick, strEndTick, Demo.DemoName, Core.Hostname, bonusid, style, Core.FastDL, Core.DownloadURL, floatTickRate);
 		FormatEx(g_strWRLog, sizeof(g_strWRLog), "%s [Bonus %d] FINISHED by %s --- Time %s (%d/%d) --- StartTick %s --- EndTick %s --- %s", Demo.Mapname, bonusid, playerName, sRunTime, rank, total, strStartTick, strEndTick, Demo.DemoName);
 		FormatEx(query, sizeof(query), sql_insertRun, DB_Name, playerId, sRunTime, strStartTick, strEndTick, Demo.DemoName, Core.Hostname, bonusid, 0, style, 0, Core.FastDL, Core.DownloadURL, floatTickRate);
 	}
@@ -878,20 +863,12 @@ void moveExpired()
 	Transaction expired = SQL_CreateTransaction();
 	char		query[1024];
 
-	// Old queries
-	// FormatEx(query_MoveExpired, sizeof(query_MoveExpired), "INSERT INTO %s (SELECT * FROM %s WHERE `Date` < NOW() - INTERVAL %i DAY);", DB_Name_Expired, DB_Name, Core.ExpireTime);
-	// FormatEx(query_DeleteExpired, sizeof(query_DeleteExpired), "DELETE FROM %s WHERE `Date` < NOW() - INTERVAL %i DAY;", DB_Name, Core.ExpireTime);
-
 	// Copy all expired runs to expired table
 	FormatEx(query, sizeof(query), sql_moveExpired, DB_Name_Expired, DB_Name, Core.ExpireTime);
 	SQL_AddQuery(expired, query);
 	// Delete all expired runs from main table
 	FormatEx(query, sizeof(query), sql_deleteExpired, DB_Name, Core.ExpireTime);
 	SQL_AddQuery(expired, query);
-
-	// Old queries
-	// FormatEx(query_MoveExpired, sizeof(query_MoveExpired), "INSERT INTO %s (SELECT * FROM %s WHERE `timestamp` < NOW() - INTERVAL %i DAY);", DB_Checkpoints_Expired, DB_Checkpoints, Core.ExpireTime);
-	// FormatEx(query_DeleteExpired, sizeof(query_DeleteExpired), "DELETE FROM %s WHERE `timestamp` < NOW() - INTERVAL %i DAY;", DB_Checkpoints, Core.ExpireTime);
 
 	// Copy checkpoints to expired
 	FormatEx(query, sizeof(query), sql_moveExpired, DB_Checkpoints_Expired, DB_Checkpoints, Core.ExpireTime);
