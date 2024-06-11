@@ -13,7 +13,7 @@ Keeps track of all runs made on the server and keeps demos for all **Runs**
     - Saves demo _(check cfg for path)_ or **deletes the recorded demo if no map, bonus or stage was completed**
   - Using the `!demos` command will show a menu from which you can find demos for all runs currently stored in the database (also lists all of them in the player console)
     - Selecting a demo from the menu will call the `SurfTV_SelectedDemo` forward which you can use in conjuction with another plugin to move demos around to publicly accessible folders for players to download them
-    - Without utilizing the forward nothing will basically happen without some edit to the code and compiling again or making another plugin (check out [this](https://github.com/tslashd/SurfTimer-GOTV/edit/main/README.md#some-additional-information) paragraph)
+    - Without utilizing the forward nothing will basically happen without some edit to the code and compiling again or making another plugin (check out [this](https://github.com/tslashd/SurfTimer-GOTV?tab=readme-ov-file#some-additional-information) paragraph)
     
 
 
